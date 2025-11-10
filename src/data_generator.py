@@ -356,10 +356,7 @@ def calculate_route_distance(coordinates):
 
 
 def adjust_path_for_speed(coordinates, target_speed_mps, target_distance_m, interval_seconds, log_cb=None):
-    """
-    根据目标速度调整路径，根据路径长度选择不同策略
-    优化版本：创建原始坐标与百分比的映射关系，使用百分比来选择剩余距离的坐标点
-    """
+
     if not coordinates:
         return []
 
@@ -778,12 +775,9 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
             log_output(f"使用默认路线文件: default.txt", "info", log_cb)
             original_coordinates = read_gps_coordinates_from_file(default_loc_path)
 
-    # 应用GPS坐标偏移校正
-    # 原始坐标：(121.43408070767154, 31.023243657753756) 
-    # 当前偏移：(121.44059342261889, 31.02885254751853)
-    # 偏移量：经度 +0.00651271494735，纬度 +0.00560888976477
-    longitude_offset = -0.00651271494735  # 负值以校正向东偏移
-    latitude_offset = -0.00560888976477   # 负值以校正向北偏移
+
+    longitude_offset = -0.00651271494735 + 0.000094 # 负值以校正向东偏移
+    latitude_offset = -0.00560888976477 -0.000700   # 负值以校正向北偏移
     
     corrected_coordinates = []
     for lon, lat in original_coordinates:
@@ -793,23 +787,7 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
     
     original_coordinates = corrected_coordinates
     log_output(f"GPS坐标已校正，共 {len(corrected_coordinates)} 个坐标点", "info", log_cb)
-    
-    # 应用额外的微调校正 - 解决地图选择坐标与实际记录坐标不一致的问题
-    # 在用户反馈中，选择坐标后实际记录坐标与选择坐标有差异
-    # 根据实测数据调整坐标偏差：显示坐标(121.4360659628486,31.024821917009408) -> 实际应为(121.43630401380874,31.02476776149208)
-    # 计算所需校正值：经度+0.000238，纬度-0.000054
-    # 总计校正值（原始微调+精确校正）：经度-0.000144+0.000094=+0.000094，纬度-0.000646-0.000054=-0.000700
-    additional_longitude_offset = 0.000094  # 额外的经度校正（原始微调+精确校正）
-    additional_latitude_offset = -0.000700   # 额外的纬度校正（原始微调+精确校正）
-    
-    final_coordinates = []
-    for lon, lat in original_coordinates:
-        final_lon = lon + additional_longitude_offset
-        final_lat = lat + additional_latitude_offset
-        final_coordinates.append((final_lon, final_lat))
-    
-    original_coordinates = final_coordinates
-    log_output(f"GPS坐标微调校正完成，共 {len(final_coordinates)} 个坐标点", "info", log_cb)
+
 
     # 目标参数
     target_distance_km = config.get('RUN_DISTANCE_KM', 5)  # 从配置获取目标距离，默认5km
