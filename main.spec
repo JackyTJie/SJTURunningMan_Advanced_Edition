@@ -24,7 +24,6 @@ a = Analysis(
         'src.config',
         'utils.auxiliary_util',
         'assets.resources_rc',
-        'urllib3',
     ],
     hookspath=[],
     hooksconfig={},
@@ -45,7 +44,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='SJTURunningMan-GUI',
+    name='SJTURunningMan',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -58,5 +57,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/SJTURM.png',
+    icon='assets\\SJTURM.png',
 )

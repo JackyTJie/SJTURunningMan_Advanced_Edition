@@ -743,16 +743,40 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
     生成符合POST请求体格式的跑步数据，并整合打卡点。
     """
     # 优先从user.txt文件读取GPS坐标（默认路线），如果不存在则使用default.txt（备用路线）
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    user_loc_path = os.path.join(project_root, 'user.txt')
-    default_loc_path = os.path.join(project_root, 'default.txt')
+    from utils.auxiliary_util import get_base_path
+    base_path = get_base_path()
     
-    if os.path.exists(user_loc_path):
-        log_output(f"使用当前路线文件: user.txt", "info", log_cb)
-        original_coordinates = read_gps_coordinates_from_file(user_loc_path)
+    # Check if a specific route file was provided in config (for CLI)
+    config_route_file = config.get('ROUTE_FILE')
+    if config_route_file:
+        # Use the route file specified in config
+        route_path = os.path.join(base_path, config_route_file)
+        if os.path.exists(route_path):
+            log_output(f"使用配置指定路线文件: {config_route_file}", "info", log_cb)
+            original_coordinates = read_gps_coordinates_from_file(route_path)
+        else:
+            log_output(f"配置指定路线文件不存在: {config_route_file}，尝试默认文件", "warning", log_cb)
+            # Fallback to the original logic - load this after
+            user_loc_path = os.path.join(base_path, 'user.txt')
+            default_loc_path = os.path.join(base_path, 'default.txt')
+            
+            if os.path.exists(user_loc_path):
+                log_output(f"使用当前路线文件: user.txt", "info", log_cb)
+                original_coordinates = read_gps_coordinates_from_file(user_loc_path)
+            else:
+                log_output(f"使用默认路线文件: default.txt", "info", log_cb)
+                original_coordinates = read_gps_coordinates_from_file(default_loc_path)
     else:
-        log_output(f"使用默认路线文件: default.txt", "info", log_cb)
-        original_coordinates = read_gps_coordinates_from_file(default_loc_path)
+        # Original behavior: try user.txt, fallback to default.txt
+        user_loc_path = os.path.join(base_path, 'user.txt')
+        default_loc_path = os.path.join(base_path, 'default.txt')
+
+        if os.path.exists(user_loc_path):
+            log_output(f"使用当前路线文件: user.txt", "info", log_cb)
+            original_coordinates = read_gps_coordinates_from_file(user_loc_path)
+        else:
+            log_output(f"使用默认路线文件: default.txt", "info", log_cb)
+            original_coordinates = read_gps_coordinates_from_file(default_loc_path)
 
     # 应用GPS坐标偏移校正
     # 原始坐标：(121.43408070767154, 31.023243657753756) 

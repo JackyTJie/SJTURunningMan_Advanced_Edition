@@ -555,9 +555,11 @@ class SportsUploaderUI(QWidget):
             import os
             
             # Only look in the project root directory for route files
-            project_root = os.path.dirname(os.path.abspath(__file__))  # qtui.py is in project root
-            user_loc_path = os.path.join(project_root, 'user.txt')
-            default_loc_path = os.path.join(project_root, 'default.txt')
+            from utils.auxiliary_util import get_base_path
+            # Use the base path which works for both compiled and non-compiled versions
+            base_path = get_base_path()
+            user_loc_path = os.path.join(base_path, 'user.txt')
+            default_loc_path = os.path.join(base_path, 'default.txt')
 
             if os.path.exists(user_loc_path):
                 route_path = user_loc_path
@@ -808,8 +810,10 @@ class SportsUploaderUI(QWidget):
                     QMessageBox.critical(self, "错误", f"生成路线规划器失败：\n{str(e)}")
             else:
                 # Check if user.txt exists
-                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                user_txt_path = os.path.join(project_root, 'user.txt') 
+                from utils.auxiliary_util import get_base_path
+                base_path = get_base_path()
+                user_txt_path = os.path.join(base_path, 'user.txt')
+                default_txt_path = os.path.join(base_path, 'default.txt') 
                 
                 if os.path.exists(user_txt_path):
                     QMessageBox.information(self, "当前路线", 
