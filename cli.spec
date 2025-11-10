@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['qtui.py'],
+    ['cliui.py'],
     pathex=[],
     binaries=[],
     datas=[
@@ -11,9 +11,6 @@ a = Analysis(
         ('default.txt', '.'),
     ],
     hiddenimports=[
-        'PySide6.QtCore',
-        'PySide6.QtGui',
-        'PySide6.QtWidgets',
         'requests',
         'tenacity',
         'src.main',
@@ -23,7 +20,6 @@ a = Analysis(
         'src.login',
         'src.config',
         'utils.auxiliary_util',
-        'assets.resources_rc',
         'urllib3',
     ],
     hookspath=[],
@@ -45,14 +41,14 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='SJTURunningMan-GUI',
+    name='SJTURunningMan-CLI',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,  # CLI version should show console
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
