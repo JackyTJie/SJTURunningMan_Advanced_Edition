@@ -8,6 +8,9 @@
 
 本工具支持自定义跑步天数、时间和距离，帮助用户灵活完成体育锻炼要求。默认配置会生成从上一日开始的连续指定天数的跑步记录（默认为1天），每次跑步5km，时间为8:00。程序优先使用user.txt作为路线文件，若不存在则使用default.txt作为默认路线文件。
 
+
+> 基于 [accelerator-s/SJTURunningMan_Revise_Edition](https://github.com/accelerator-s/SJTURunningMan_Revise_Edition) 的增强版本
+
 ## 功能特性
 
 ### 1. 图形用户界面 (GUI)
@@ -233,10 +236,17 @@ python cliui.py -u <username> -p <password> -d 5.0
 - 如需精确控制跑步距离，请多次尝试以找到最适合的设置
 - 自定义路线时，确保路线长度与目标距离匹配，避免过长或过短
 
+
+## 🙏 致谢
+
+- **原项目作者**: [@Labyrinth0419](https://github.com/Labyrinth0419) - 创建了优秀的原项目
+- **原增强版作者**: [@accelerator-s](https://github.com/accelerator-s) - 添加了新功能和改进
+
 ## 免责声明
 
 本工具仅供学习和研究目的，开发者不对因使用本工具造成的任何后果负责。请谨慎使用，并遵守所有适用的法律法规和学校规章制度。
 
 ---
 
-**文档最后更新: Monday, November 10, 2025**
+
+**Last Update: Monday, November 10, 2025**
