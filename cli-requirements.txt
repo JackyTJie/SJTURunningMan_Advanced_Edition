@@ -1,0 +1,9 @@
+# CLI Requirements for SJTU Running Man Tool
+# Dependencies required specifically for the command-line interface functionality
+
+requests>=2.31.0  # Essential for making API requests to SJTU running system
+tenacity>=8.2.0   # For retry logic during API calls
+urllib3>=1.26.0   # For HTTP connection handling
+
+# Note: The --customize-route option uses webbrowser module which is part of Python standard library
+# All other dependencies are the same as the core application
