@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
     QSpacerItem, QFileDialog
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent
+from PySide6.QtCore import QThread, Signal, QDateTime, QDate, Qt, QUrl, QEvent
 from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices
 
 from src.main import run_sports_upload
@@ -99,8 +99,8 @@ class SportsUploaderUI(QWidget):
         self.setup_ui_style()
         self.init_ui()
 
-        self.setGeometry(300, 100, 380, 500)
-        self.setMinimumSize(380, 500)
+        self.setGeometry(300, 50, 520, 750)
+        self.setMinimumSize(520, 750)
 
         # 根据当前窗口宽度调整内容区域宽度
         self.adjust_content_width(self.width())
@@ -137,19 +137,19 @@ class SportsUploaderUI(QWidget):
             
             /* GroupBox 样式 */
             QGroupBox {
-                font-size: 12pt;
+                font-size: 10pt;
                 font-weight: bold;
-                margin-top: 15px;
+                margin-top: 10px;
                 border: 1px solid rgb(220, 220, 220);
                 border-radius: 6px;
-                padding-top: 10px;
-                padding-bottom: 10px;
+                padding: 15px;
                 color: rgb(74, 144, 226);
+                background-color: rgb(248, 249, 250);
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                subcontrol-position: top center;
-                padding: 0 8px;
+                subcontrol-position: top left;
+                padding: 0 5px 0 5px;
                 color: rgb(74, 144, 226);
                 background-color: rgb(255, 255, 255);
             }
@@ -161,7 +161,7 @@ class SportsUploaderUI(QWidget):
                 font-size: 9pt;
             }
             
-            QLineEdit, QComboBox {
+            QLineEdit, QComboBox, QDateTimeEdit {
                 background-color: rgb(255, 255, 255);
                 border: 1px solid rgb(204, 204, 204);
                 border-radius: 4px;
@@ -298,8 +298,10 @@ class SportsUploaderUI(QWidget):
         self.scroll_area = QScrollArea()
         self.scroll_content = QWidget()
         scroll_layout = QVBoxLayout(self.scroll_content)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(20)
+        # Add margins to make content look better in the larger window
+        scroll_layout.setContentsMargins(20, 20, 20, 20)
+        # Reduce spacing to fit more content
+        scroll_layout.setSpacing(15)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_content)
 
@@ -325,50 +327,104 @@ class SportsUploaderUI(QWidget):
         run_settings_group = QGroupBox("上传设置")
         run_settings_layout = QVBoxLayout()
         run_settings_layout.setContentsMargins(15, 15, 15, 15)
+        run_settings_layout.setSpacing(20)
 
-        # 运行次数选择
-        run_times_layout = QHBoxLayout()
-        self.run_times_combo = QComboBox()
-        self.run_times_combo.addItems(["自定义", "1", "5", "10", "15", "20", "25"])
-        self.run_times_combo.setCurrentIndex(1)  # 默认选择1天
-        run_times_layout.addWidget(QLabel("上传天数:"))
-        run_times_layout.addWidget(self.run_times_combo)
+        # 运行次数选择 - 天数 (垂直布局)
+        days_layout = QVBoxLayout()
+        days_label_layout = QHBoxLayout()
+        days_label_layout.addWidget(QLabel("上传天数:"))
+        days_label_layout.addStretch()
+        days_layout.addLayout(days_label_layout)
 
+        days_input_layout = QHBoxLayout()
+        self.run_days_combo = QComboBox()
+        self.run_days_combo.addItems(["自定义", "1", "5", "10", "15", "20", "25"])
+        self.run_days_combo.setCurrentIndex(1)  # 默认选择1天
+        days_input_layout.addWidget(self.run_days_combo)
+
+        # 自定义天数输入框（默认隐藏）
         self.custom_days_input = QLineEdit()
         self.custom_days_input.setPlaceholderText("输入自定义天数")
         self.custom_days_input.setVisible(False)  # 默认隐藏
-        run_times_layout.addWidget(self.custom_days_input)
+        days_input_layout.addWidget(self.custom_days_input)
+        days_layout.addLayout(days_input_layout)
 
-        # 连接下拉框变化事件
-        self.run_times_combo.currentTextChanged.connect(self.on_run_times_changed)
-        
-        run_settings_layout.addLayout(run_times_layout)
+        run_settings_layout.addLayout(days_layout)
 
-        # 运行时间选择
-        run_time_layout = QHBoxLayout()
+        # 连接天数下拉框变化事件
+        self.run_days_combo.currentTextChanged.connect(self.on_run_days_changed)
+
+        # 运行时间选择 - 时间 (垂直布局)
+        time_layout = QVBoxLayout()
+        time_label_layout = QHBoxLayout()
+        time_label_layout.addWidget(QLabel("跑步时间:"))
+        time_label_layout.addStretch()
+        time_layout.addLayout(time_label_layout)
+
+        time_input_layout = QHBoxLayout()
         self.run_time_combo = QComboBox()
-        # Add hours from 6 to 23 (6 AM to 11 PM)
+        # Add "Custom" option for precise time selection at the top
+        self.run_time_combo.addItem("自定义时间 (HH:MM:SS)")
+
+        # Add hours from 6 to 23 (6:00 AM to 11:00 PM) - just hour intervals
         for hour in range(6, 24):  # 6 AM to 11 PM (23:00)
-            self.run_time_combo.addItem(f"{hour:02d}:00")  # Format as HH:00
-        
-        self.run_time_combo.setCurrentIndex(8-6)  # 默认选择8:00 AM (index 8-6=2)
-        run_time_layout.addWidget(QLabel("跑步时间:"))
-        run_time_layout.addWidget(self.run_time_combo)
-        
-        run_settings_layout.addLayout(run_time_layout)
+            self.run_time_combo.addItem(f"{hour:02d}:00")
+
+        # Default to 8:00 AM (index 3: custom option at index 0, then 6:00, 7:00, 8:00 at index 2+1=3)
+        default_index = 8 - 6 + 1  # 8 AM minus 6 AM plus 1 for the custom option at the beginning
+        self.run_time_combo.setCurrentIndex(default_index)
+        time_input_layout.addWidget(self.run_time_combo)
+
+        # Custom time input layout (initially hidden)
+        self.custom_time_input = QLineEdit()
+        self.custom_time_input.setPlaceholderText("HH:MM:SS (例如: 08:30:45, 24小时制)")
+        self.custom_time_input.setVisible(False)  # Initially hidden
+        time_input_layout.addWidget(self.custom_time_input)
+
+        time_layout.addLayout(time_input_layout)
+
+        run_settings_layout.addLayout(time_layout)
+
+        # Connect time combo change to show/hide custom time input
+        self.run_time_combo.currentTextChanged.connect(self.on_run_time_changed)
+
+        # 运行日期选择 - 日期 (垂直布局)
+        date_layout = QVBoxLayout()
+        date_label_layout = QHBoxLayout()
+        date_label_layout.addWidget(QLabel("开始日期:"))
+        date_label_layout.addStretch()
+        date_layout.addLayout(date_label_layout)
+
+        date_input_layout = QHBoxLayout()
+        self.date_input = QLineEdit()
+        from datetime import datetime, timedelta
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        self.date_input.setText(yesterday)  # 默认显示昨天的日期
+        self.date_input.setPlaceholderText("YYYY-MM-DD (例如: " + yesterday + ")")
+        date_input_layout.addWidget(self.date_input)
+
+        date_layout.addLayout(date_input_layout)
+
+        run_settings_layout.addLayout(date_layout)
 
         # 运行距离选择
-        run_distance_layout = QHBoxLayout()
+        distance_layout = QVBoxLayout()
+        distance_label_layout = QHBoxLayout()
+        distance_label_layout.addWidget(QLabel("跑步距离:"))
+        distance_label_layout.addStretch()
+        distance_layout.addLayout(distance_label_layout)
+
+        distance_input_layout = QHBoxLayout()
         self.run_distance_combo = QComboBox()
         # Add distances from 1 to 5 km
         for distance in range(1, 6):  # 1 to 5 km
             self.run_distance_combo.addItem(f"{distance} km")
-        
+
         self.run_distance_combo.setCurrentIndex(4)  # 默认选择5 km (index 4)
-        run_distance_layout.addWidget(QLabel("跑步距离:"))
-        run_distance_layout.addWidget(self.run_distance_combo)
-        
-        run_settings_layout.addLayout(run_distance_layout)
+        distance_input_layout.addWidget(self.run_distance_combo)
+        distance_layout.addLayout(distance_input_layout)
+
+        run_settings_layout.addLayout(distance_layout)
 
         run_settings_group.setLayout(run_settings_layout)
         scroll_layout.addWidget(run_settings_group)
@@ -406,19 +462,27 @@ class SportsUploaderUI(QWidget):
         self.log_output_area = QTextEdit()
         self.log_output_area.setReadOnly(True)
         self.log_output_area.setFont(QFont("Monospace", 9))
-        self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # Reduce the vertical stretch factor to give more space to other components
+        self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         scroll_layout.addWidget(self.log_output_area)
 
         top_h_layout.addWidget(self.center_widget)
 
         self.setLayout(top_h_layout)
 
-    def on_run_times_changed(self, text):
-        """处理运行次数选择变化事件"""
+    def on_run_days_changed(self, text):
+        """处理运行天数选择变化事件"""
         if text == "自定义":
             self.custom_days_input.setVisible(True)
         else:
             self.custom_days_input.setVisible(False)
+
+    def on_run_time_changed(self, text):
+        """处理运行时间选择变化事件"""
+        if text == "自定义时间 (HH:MM:SS)":
+            self.custom_time_input.setVisible(True)
+        else:
+            self.custom_time_input.setVisible(False)
 
     def resizeEvent(self, event):
         """
@@ -459,7 +523,7 @@ class SportsUploaderUI(QWidget):
             password = self.password_input.text()
 
             # 获取运行次数
-            run_times_text = self.run_times_combo.currentText()
+            run_times_text = self.run_days_combo.currentText()
             if run_times_text == "自定义":
                 custom_days_text = self.custom_days_input.text().strip()
                 if not custom_days_text:
@@ -473,9 +537,37 @@ class SportsUploaderUI(QWidget):
             else:
                 run_times = int(run_times_text)
 
-            # 获取运行时间（小时）
+            # 获取运行时间
             run_time_text = self.run_time_combo.currentText()
-            run_hour = int(run_time_text.split(':')[0])  # Extract hour from "HH:00" format
+            if run_time_text == "自定义时间 (HH:MM:SS)":
+                # Use custom time input
+                custom_time_text = self.custom_time_input.text().strip()
+                if not custom_time_text:
+                    raise ValueError("请输入自定义时间，格式为 HH:MM:SS")
+
+                try:
+                    # Parse custom time in HH:MM:SS format
+                    time_parts = custom_time_text.split(':')
+                    if len(time_parts) != 3:
+                        raise ValueError("时间格式错误，应为 HH:MM:SS")
+                    run_hour = int(time_parts[0])
+                    run_minute = int(time_parts[1])
+                    run_second = int(time_parts[2])
+
+                    if not (0 <= run_hour <= 23):
+                        raise ValueError("小时应在 0-23 之间")
+                    if not (0 <= run_minute <= 59):
+                        raise ValueError("分钟应在 0-59 之间")
+                    if not (0 <= run_second <= 59):
+                        raise ValueError("秒钟应在 0-59 之间")
+                except ValueError:
+                    raise ValueError("时间格式错误，应为 HH:MM:SS，例如 08:30:45")
+            else:
+                # Use predefined time - format is "HH:00"
+                time_parts = run_time_text.split(':')
+                run_hour = int(time_parts[0])  # Extract hour from "HH:00" format
+                run_minute = int(time_parts[1])  # Extract minute from "HH:00" format (should be 00)
+                run_second = 0  # Default second for predefined times
 
             # 获取运行距离（公里）
             run_distance_text = self.run_distance_combo.currentText()
@@ -486,6 +578,8 @@ class SportsUploaderUI(QWidget):
                 "PASSWORD": password,
                 "RUN_TIMES": run_times,  # 添加运行次数配置
                 "RUN_HOUR": run_hour,    # 添加运行小时配置
+                "RUN_MINUTE": run_minute,    # 添加运行分钟配置
+                "RUN_SECOND": run_second,    # 添加运行秒钟配置
                 "RUN_DISTANCE_KM": run_distance_km,  # 添加运行距离配置
                 "START_LATITUDE": float(self.config.get("START_LATITUDE", 31.031599)),
                 "START_LONGITUDE": float(self.config.get("START_LONGITUDE", 121.442938)),
@@ -499,6 +593,11 @@ class SportsUploaderUI(QWidget):
                 "POINT_RULE_URL": "https://pe.sjtu.edu.cn/api/running/point-rule",  # Fixed URL
                 "UPLOAD_URL": "https://pe.sjtu.edu.cn/api/running/result/upload"
             }
+
+            # Add start date from text input (the input is always filled with a default value)
+            start_date_text = self.date_input.text().strip()
+            if start_date_text:
+                current_config["START_DATE"] = start_date_text
 
             # START_TIME_EPOCH_MS 由后端生成，不从 UI 获取
 

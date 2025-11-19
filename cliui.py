@@ -15,6 +15,45 @@ from src import login
 from utils.auxiliary_util import log_output, SportsUploaderError
 
 
+class CustomHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Custom help formatter that adds more spacing between arguments"""
+
+    def __init__(self, prog, indent_increment=2, max_help_position=48, width=None):
+        super().__init__(prog, indent_increment, max_help_position, width)
+
+    def _format_action_invocation(self, action):
+        if not action.option_strings:
+            # Positional argument
+            default = self._get_default_metavar_for_positional(action)
+            metavar, = self._metavar_formatter(action, default)(1)
+            return metavar
+        else:
+            # Option argument
+            parts = []
+            # Add any option strings (like --username, -u)
+            parts.extend(action.option_strings)
+
+            # Add metavar if it has one (like USERNAME)
+            if action.nargs != 0:
+                default = self._get_default_metavar_for_optional(action)
+                args_string = self._format_args(action, default)
+                parts[-1] += f' {args_string}'
+
+            return ', '.join(parts)
+
+    def _format_action(self, action):
+        # First, call the parent method to get the original formatted action
+        original = super()._format_action(action)
+
+        # Add extra newline after each action to create more spacing
+        if action.nargs == argparse.PARSER or action.nargs == argparse.REMAINDER:
+            # Don't add extra space for subparsers
+            return original
+        else:
+            # Add an extra newline to create more spacing between options
+            return original + '\n'
+
+
 def progress_callback(current, total, message):
     """Callback function for progress updates"""
     print(f"\rProgress: {current}/{total} - {message}", end="", flush=True)
@@ -39,8 +78,8 @@ def stop_check_callback():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="SJTU Running Man CLI Tool with Advanced Development Options",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="SJTU Running Man CLI Tool with Advanced Development Options\n",
+        formatter_class=CustomHelpFormatter,
         epilog="""
 Examples:
   Basic usage: python cliui.py -u <username> -p <password> -d 5.0
@@ -52,46 +91,57 @@ Examples:
         """
     )
 
-    # Basic authentication and run options
-    parser.add_argument("--username", "-u", help="Student ID/Username for SJTU running system")
-    parser.add_argument("--password", "-p", help="Password for SJTU running system")
-    parser.add_argument("--distance", "-d", type=float, default=5.0, help="Target running distance in km (default: 5.0)")
-    parser.add_argument("--hour", "-H", type=int, default=8, help="Run hour (default: 8 for 8:00 AM)")
-    parser.add_argument("--times", "-t", type=int, default=1, help="Number of days to upload (default: 1)")
-    parser.add_argument("--pace", "-P", type=float, default=3.5, help="Target pace in min/km (default: 3.5 min/km)")
+    # Authentication options
+    auth_group = parser.add_argument_group('Authentication Options')
+    auth_group.add_argument("--username", "-u", help="Student ID/Username for SJTU running system")
+    auth_group.add_argument("--password", "-p", help="Password for SJTU running system")
+
+    # Run configuration options
+    run_group = parser.add_argument_group('Run Configuration Options')
+    run_group.add_argument("--distance", "-d", type=float, default=5.0, help="Target running distance in km (default: 5.0)")
+    run_group.add_argument("--hour", "-H", type=int, default=8, help="Run hour (default: 8 for 8:00 AM)")
+    run_group.add_argument("--minute", type=int, default=0, help="Run minute (default: 0, use with --hour)")
+    run_group.add_argument("--start-date", help="Start date in YYYY-MM-DD format (default: yesterday, uploads backwards from this date)")
+    run_group.add_argument("--times", "-t", type=int, default=1, help="Number of days to upload (default: 1)")
+    run_group.add_argument("--pace", "-P", type=float, default=3.5, help="Target pace in min/km (default: 3.5 min/km)")
 
     # Route selection options
-    parser.add_argument("--route", "-r", choices=['default', 'user'], default='default',
+    route_group = parser.add_argument_group('Route Options')
+    route_group.add_argument("--route", "-r", choices=['default', 'user'], default='default',
                        help="Select route file: 'default' or 'user' (default: 'default')")
-    parser.add_argument("--route-file", help="Custom route file path (overrides --route option)")
-    parser.add_argument("--customize-route", "-C", action="store_true",
+    route_group.add_argument("--route-file", help="Custom route file path (overrides --route option)")
+    route_group.add_argument("--customize-route", "-C", action="store_true",
                        help="Open browser to customize route graphically")
 
-    # Advanced development options
-    parser.add_argument("--speed-override", "-s", type=float, help="Override calculated speed in m/s (advanced)")
-    parser.add_argument("--compensation", "-c", type=int, default=200, help="Distance compensation in meters (default: 200m)")
-    parser.add_argument("--interval", "-i", type=int, default=3, help="Interval between GPS points in seconds (default: 3)")
-    parser.add_argument("--min-pace", type=float, default=180, help="Minimum allowed pace in seconds/km (default: 180s/km)")
-    parser.add_argument("--max-pace", type=float, default=540, help="Maximum allowed pace in seconds/km (default: 540s/km)")
+    # Advanced options
+    advanced_group = parser.add_argument_group('Advanced Development Options')
+    advanced_group.add_argument("--speed-override", "-s", type=float, help="Override calculated speed in m/s (advanced)")
+    advanced_group.add_argument("--compensation", "-c", type=int, default=200, help="Distance compensation in meters (default: 200m)")
+    advanced_group.add_argument("--interval", "-i", type=int, default=3, help="Interval between GPS points in seconds (default: 3)")
+    advanced_group.add_argument("--min-pace", type=float, default=180, help="Minimum allowed pace in seconds/km (default: 180s/km)")
+    advanced_group.add_argument("--max-pace", type=float, default=540, help="Maximum allowed pace in seconds/km (default: 540s/km)")
 
-    # Route and location options
-    parser.add_argument("--start-lat", type=float, default=31.031599, help="Starting latitude (default: 31.031599)")
-    parser.add_argument("--start-lon", type=float, default=121.442938, help="Starting longitude (default: 121.442938)")
-    parser.add_argument("--end-lat", type=float, default=31.0264, help="Ending latitude (default: 31.0264)")
-    parser.add_argument("--end-lon", type=float, default=121.4551, help="Ending longitude (default: 121.4551)")
+    # Location options
+    location_group = parser.add_argument_group('Location Options')
+    location_group.add_argument("--start-lat", type=float, default=31.031599, help="Starting latitude (default: 31.031599)")
+    location_group.add_argument("--start-lon", type=float, default=121.442938, help="Starting longitude (default: 121.442938)")
+    location_group.add_argument("--end-lat", type=float, default=31.0264, help="Ending latitude (default: 31.0264)")
+    location_group.add_argument("--end-lon", type=float, default=121.4551, help="Ending longitude (default: 121.4551)")
 
-    # Development and debugging options
-    parser.add_argument("--verify-credentials", action="store_true", help="Verify credentials without uploading")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
-    parser.add_argument("--debug-mode", action="store_true", help="Enable debug mode with detailed logging")
-    parser.add_argument("--dry-run", action="store_true", help="Simulate the run without actual upload")
+    # Debugging options
+    debug_group = parser.add_argument_group('Debugging Options')
+    debug_group.add_argument("--verify-credentials", action="store_true", help="Verify credentials without uploading")
+    debug_group.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    debug_group.add_argument("--debug-mode", action="store_true", help="Enable debug mode with detailed logging")
+    debug_group.add_argument("--dry-run", action="store_true", help="Simulate the run without actual upload")
 
-    # API endpoint options (for development/testing)
-    parser.add_argument("--host", default="pe.sjtu.edu.cn", help="API host (default: pe.sjtu.edu.cn)")
-    parser.add_argument("--uid-url", default="https://pe.sjtu.edu.cn/sports/my/uid", help="UID API URL")
-    parser.add_argument("--my-data-url", default="https://pe.sjtu.edu.cn/sports/my/data", help="My Data API URL")
-    parser.add_argument("--point-rule-url", default="https://pe.sjtu.edu.cn/api/running/point-rule", help="Point Rule API URL")
-    parser.add_argument("--upload-url", default="https://pe.sjtu.edu.cn/api/running/result/upload", help="Upload API URL")
+    # API endpoint options
+    api_group = parser.add_argument_group('API Endpoint Options (for development/testing)')
+    api_group.add_argument("--host", default="pe.sjtu.edu.cn", help="API host (default: pe.sjtu.edu.cn)")
+    api_group.add_argument("--uid-url", default="https://pe.sjtu.edu.cn/sports/my/uid", help="UID API URL")
+    api_group.add_argument("--my-data-url", default="https://pe.sjtu.edu.cn/sports/my/data", help="My Data API URL")
+    api_group.add_argument("--point-rule-url", default="https://pe.sjtu.edu.cn/api/running/point-rule", help="Point Rule API URL")
+    api_group.add_argument("--upload-url", default="https://pe.sjtu.edu.cn/api/running/result/upload", help="Upload API URL")
 
     args = parser.parse_args()
 
@@ -209,6 +259,8 @@ Examples:
         'USER_ID': username,
         'RUN_TIMES': args.times,
         'RUN_HOUR': args.hour,
+        'RUN_MINUTE': args.minute,
+        'START_DATE': args.start_date,  # Add custom start date
         'RUN_DISTANCE_KM': args.distance,
         'START_LATITUDE': args.start_lat,
         'START_LONGITUDE': args.start_lon,

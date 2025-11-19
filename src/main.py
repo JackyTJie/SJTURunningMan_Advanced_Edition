@@ -75,8 +75,26 @@ def run_sports_upload(config, progress_callback=None, log_cb=None, stop_check_cb
         # 计算日期列表 - upload for the past N days (yesterday, the day before yesterday, etc.)
         now = datetime.datetime.now()
         run_hour = config.get('RUN_HOUR', 8)  # 从配置获取运行小时，默认为8点
-        # Calculate start times for the past N days (yesterday, the day before yesterday, etc.)
-        start_times = [(now - datetime.timedelta(days=i+1)).replace(hour=run_hour, minute=0, second=0, microsecond=0) for i in range(total_runs)]
+        run_minute = config.get('RUN_MINUTE', 0)  # 从配置获取运行分钟，默认为0
+        run_second = config.get('RUN_SECOND', 0)  # 从配置获取运行秒钟，默认为0
+
+        # Check if custom start date is provided
+        start_date_str = config.get('START_DATE', None)
+        if start_date_str:
+            try:
+                # Parse custom start date
+                start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d')
+                # Set the time using RUN_HOUR, RUN_MINUTE, and RUN_SECOND
+                start_date = start_date.replace(hour=run_hour, minute=run_minute, second=run_second, microsecond=0)
+                # Calculate start times going backwards from the custom start date
+                start_times = [start_date - datetime.timedelta(days=i) for i in range(total_runs)]
+            except ValueError:
+                # If date parsing fails, fall back to default behavior
+                log_output(f"日期解析失败，使用默认日期: {start_date_str}，格式应为 YYYY-MM-DD", "warning", log_cb)
+                start_times = [(now - datetime.timedelta(days=i+1)).replace(hour=run_hour, minute=run_minute, second=run_second, microsecond=0) for i in range(total_runs)]
+        else:
+            # Calculate start times for the past N days (yesterday, the day before yesterday, etc.)
+            start_times = [(now - datetime.timedelta(days=i+1)).replace(hour=run_hour, minute=run_minute, second=run_second, microsecond=0) for i in range(total_runs)]
 
         for idx, start_dt in enumerate(start_times, 1):
             if stop_check_cb and stop_check_cb():
