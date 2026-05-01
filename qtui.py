@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
-    QSpacerItem, QFileDialog
+    QSpacerItem, QFileDialog, QDialog
 )
 from PySide6.QtCore import QThread, Signal, QDateTime, QDate, Qt, QUrl, QEvent
 from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices
@@ -611,6 +611,86 @@ class SportsUploaderUI(QWidget):
         except Exception as e:
             raise Exception(f"获取配置时发生未知错误: {e}")
 
+    def _2fa_select_method(self):
+        """二次验证：让用户选择验证方式"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("异地登录验证")
+        dialog.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
+        dialog.setFixedSize(360, 180)
+        dialog.setWindowModality(Qt.WindowModal)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
+
+        label = QLabel("请选择验证方式:")
+        label.setStyleSheet("font-size: 11pt; color: #333;")
+        layout.addWidget(label)
+
+        combo = QComboBox()
+        combo.addItems(["交我办消息", "邮箱", "短信"])
+        combo.setStyleSheet("padding: 6px; font-size: 10pt;")
+        layout.addWidget(combo)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton("确定")
+        ok_btn.setFixedWidth(80)
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setFixedWidth(80)
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        method_map = {"交我办消息": "app", "邮箱": "email", "短信": "sms"}
+        if dialog.exec() == QDialog.Accepted:
+            return method_map.get(combo.currentText(), "app")
+        return None
+
+    def _2fa_get_code(self):
+        """二次验证：获取用户输入的验证码"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("输入验证码")
+        dialog.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
+        dialog.setFixedSize(360, 180)
+        dialog.setWindowModality(Qt.WindowModal)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
+
+        label = QLabel("请输入6位验证码（输入 r 可重新发送）:")
+        label.setStyleSheet("font-size: 11pt; color: #333;")
+        layout.addWidget(label)
+
+        line_edit = QLineEdit()
+        line_edit.setPlaceholderText("验证码")
+        line_edit.setStyleSheet("padding: 6px; font-size: 10pt;")
+        layout.addWidget(line_edit)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        ok_btn = QPushButton("确定")
+        ok_btn.setFixedWidth(80)
+        ok_btn.clicked.connect(dialog.accept)
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setFixedWidth(80)
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        if dialog.exec() == QDialog.Accepted:
+            code = line_edit.text().strip()
+            return code if code else None
+        return None
+
+    def _2fa_show_message(self, msg):
+        """二次验证：显示提示信息"""
+        self.log_output_text(msg, "info")
+
     def start_upload(self):
         self.log_output_area.clear()
         self.progress_bar.setValue(0)
@@ -634,9 +714,15 @@ class SportsUploaderUI(QWidget):
         try:
             username = current_config_to_send.get("USER_ID")
             password = current_config_to_send.get("PASSWORD")
-            session = login.login(username, password)
+
+            two_fa_cb = {
+                'select_method': self._2fa_select_method,
+                'get_code': self._2fa_get_code,
+                'show_message': self._2fa_show_message,
+            }
+
+            session = login.login(username, password, two_fa_cb=two_fa_cb)
             current_config_to_send["SESSION"] = session
-            # USER_ID 即 Jaccount 用户名
             current_config_to_send["USER_ID"] = username
         except Exception as e:
             self.log_output_text(f"登录失败: {e}", "error")

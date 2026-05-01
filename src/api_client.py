@@ -4,10 +4,9 @@ from urllib.parse import quote
 from utils.auxiliary_util import log_output, SportsUploaderError
 
 def make_request(method, url, headers, params=None, data=None, log_cb=None, stop_check_cb=None, session=None):
-    """通用HTTP请求函数"""
+    """HTTP请求封装"""
     try:
         if stop_check_cb and stop_check_cb():
-            log_output("API请求被中断。", "warning", log_cb)
             raise SportsUploaderError("任务已停止。")
 
         timeout_value = 15
@@ -31,36 +30,31 @@ def make_request(method, url, headers, params=None, data=None, log_cb=None, stop
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
         if stop_check_cb and stop_check_cb():
-            log_output("API响应已获取，但任务被中断。", "warning", log_cb)
             raise SportsUploaderError("任务已停止。")
 
         response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as e:
-        log_output(f"HTTP error occurred: {e}", "error", log_cb)
-        log_output(f"URL: {url}", "error", log_cb)
+        log_output(f"HTTP错误: {e}", "error", log_cb)
         if response is not None: # pyright: ignore[reportPossiblyUnboundVariable]
-            log_output(f"Response status code: {response.status_code}", "error", log_cb) # pyright: ignore[reportPossiblyUnboundVariable]
-            log_output(f"Response text: {response.text}", "error", log_cb) # type: ignore
+            log_output(f"状态码: {response.status_code}", "error", log_cb) # pyright: ignore[reportPossiblyUnboundVariable]
             try:
-                log_output(f"Response JSON (if any): {json.dumps(response.json(), indent=2)}", "error", log_cb) # type: ignore
+                log_output(f"响应: {json.dumps(response.json(), indent=2)}", "error", log_cb) # type: ignore
             except json.JSONDecodeError:
-                log_output(f"Response text (non-JSON): {response.text}", "error", log_cb) # type: ignore
-        raise SportsUploaderError(f"HTTP Error: {e}")
+                log_output(f"响应: {response.text}", "error", log_cb) # type: ignore
+        raise SportsUploaderError(f"HTTP错误: {e}")
     except requests.exceptions.ConnectionError as e:
-        log_output(f"Connection error occurred: {e}", "error", log_cb)
-        if isinstance(e.args[0], requests.packages.urllib3.exceptions.MaxRetryError) and e.args[0].reason: # type: ignore
-            log_output(f"Underlying reason: {e.args[0].reason}", "error", log_cb)
-        raise SportsUploaderError(f"Connection Error: {e}")
+        log_output(f"连接失败: {e}", "error", log_cb)
+        raise SportsUploaderError(f"连接失败: {e}")
     except requests.exceptions.Timeout as e:
-        log_output(f"Timeout error occurred: {e}", "error", log_cb)
-        raise SportsUploaderError(f"Timeout Error: {e}")
+        log_output(f"请求超时: {e}", "error", log_cb)
+        raise SportsUploaderError(f"请求超时: {e}")
     except requests.exceptions.RequestException as e:
-        log_output(f"An unexpected error occurred: {e}", "error", log_cb)
-        raise SportsUploaderError(f"Request Error: {e}")
+        log_output(f"请求异常: {e}", "error", log_cb)
+        raise SportsUploaderError(f"请求异常: {e}")
     except json.JSONDecodeError:
-        log_output(f"Failed to decode JSON from response: {response.text if response else 'No response'}", "error", log_cb) # type: ignore
-        raise SportsUploaderError(f"JSON Decode Error: {response.text if response else 'No response'}") # type: ignore
+        log_output(f"JSON解析失败: {response.text if response else 'N/A'}", "error", log_cb) # type: ignore
+        raise SportsUploaderError(f"JSON解析失败") # type: ignore
 
 
 def get_authorization_token_and_rules(config, log_cb=None, stop_check_cb=None):
@@ -95,19 +89,17 @@ def get_authorization_token_and_rules(config, log_cb=None, stop_check_cb=None):
     if uid_response_data.get('code') == 0 and 'uid' in uid_response_data.get('data', {}):
         auth_token = uid_response_data['data']['uid']
     else:
-        raise SportsUploaderError(f"Failed to get Authorization Token: {uid_response_data}")
+        raise SportsUploaderError(f"获取认证失败: {uid_response_data}")
 
     if stop_check_cb and stop_check_cb():
-        log_output("任务被请求停止，正在退出...", "warning", log_cb)
         raise SportsUploaderError("任务已停止。")
 
     try:
         make_request('GET', config['MY_DATA_URL'], common_app_headers, log_cb=log_cb, stop_check_cb=stop_check_cb, session=config.get("SESSION"))
-    except Exception as e:
-        log_output(f"获取数据失败: {e}", "warning", log_cb)
+    except Exception:
+        pass
 
     if stop_check_cb and stop_check_cb():
-        log_output("任务被请求停止，正在退出...", "warning", log_cb)
         raise SportsUploaderError("任务已停止。")
 
     formatted_lon_for_param = f"{config['START_LONGITUDE']:.14f}"
@@ -142,9 +134,7 @@ def get_authorization_token_and_rules(config, log_cb=None, stop_check_cb=None):
     return auth_token, point_rule_response_data.get('data', {})
 
 def upload_running_data(config, auth_token, running_data, log_cb=None, stop_check_cb=None):
-    """
-    上传跑步数据到服务器。
-    """
+    """上传跑步数据"""
     headers = {
         "Authorization": auth_token,
         "Content-Type": "application/json; charset=utf-8",
@@ -155,7 +145,6 @@ def upload_running_data(config, auth_token, running_data, log_cb=None, stop_chec
     }
 
     if stop_check_cb and stop_check_cb():
-        log_output("任务被请求停止，正在退出...", "warning", log_cb)
         raise SportsUploaderError("任务已停止。")
 
     response = make_request(

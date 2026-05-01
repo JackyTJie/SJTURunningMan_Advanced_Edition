@@ -7,6 +7,13 @@ from requests.exceptions import RequestException
 from tenacity import retry, retry_if_exception_type, wait_fixed
 from utils.auxiliary_util import re_search, get_timestamp
 
+# 二次验证方式
+_2FA_METHODS = {
+    '1': ('app', '交我办'),
+    '2': ('email', '邮箱'),
+    '3': ('sms', '短信'),
+}
+
 def get_jalogin_from_authorize(session, client_id, redirect_uri, scope="profile", state="8"):
     """
     模拟浏览器访问 /oauth2/authorize 并返回最终的 /jaccount/jalogin?... URL。
@@ -45,8 +52,7 @@ def _create_session():
 # 获得登录界面网页(html)，便于之后从中提取必要信息
 @retry(retry=retry_if_exception_type(RequestException), wait=wait_fixed(3))
 def _get_login_page(session, url):
-    req = session.get(url)
-    return req.text
+    return session.get(url)
 
 # 获得验证码图片(jpeg)
 @retry(retry=retry_if_exception_type(RequestException), wait=wait_fixed(3))
@@ -59,7 +65,7 @@ def _get_captcha(session, captcha_url):
 
 
 # 调用外部模型识别验证码
-def _indentify_captcha():
+def _identify_captcha():
     captcha_solver_url = "https://geek.sjtu.edu.cn/captcha-solver/"
     image_path = "captcha.jpeg"
 
@@ -72,7 +78,7 @@ def _indentify_captcha():
         os.remove("captcha.jpeg")
         return result
     except Exception:
-        print("验证码识别失败！")
+        raise RuntimeError("验证码识别失败")
 
 @retry(retry=retry_if_exception_type(RequestException), wait=wait_fixed(3))
 def _post_login_request(session, login_page, username, password, captcha_code):
@@ -81,51 +87,136 @@ def _post_login_request(session, login_page, username, password, captcha_code):
     returl = re_search(r'returl:"(.*?)"', login_page)
     se = re_search(r'se: "(.*?)"', login_page)
     client = re_search(r'client: "(.*?)"', login_page)
-    uuid = re_search(r'captcha\?uuid=(.*?)&t=', login_page)
+    uuid_val = re_search(r'captcha\?uuid=(.*?)&t=', login_page)
 
     # 构建提交 data
     data = {'sid': sid, 'returl': returl, 'se': se, 'client': client, 'user': username,
-            'pass': password, 'captcha': captcha_code, 'v': '', 'uuid': uuid}
+            'pass': password, 'captcha': captcha_code, 'v': '', 'uuid': uuid_val}
 
     # 发起 post 请求
-    session.post(
-        'https://jaccount.sjtu.edu.cn/jaccount/ulogin', data = data)
+    res = session.post('https://jaccount.sjtu.edu.cn/jaccount/ulogin', data=data)
+    return res
 
 
-    # 登录成功会在 cookies 中获得 JAAuthCookie
+def _is_2fa_page(text):
+    """检测是否为二次验证页面"""
+    return ("请进行二次验证" in text
+            or "2faVerify" in text
+            or "2fa/loginVerify" in text)
+
+
+def _send_2fa_code(session, method):
+    """发送二次验证码"""
+    url = "https://jaccount.sjtu.edu.cn/jaccount/2fa/loginVerify"
+    resp = session.post(url, data={'c': method}, headers={
+        'X-Requested-With': 'XMLHttpRequest',
+    })
+    result = resp.json()
+    if result.get('errno', -1) != 0:
+        raise RuntimeError(f"验证码发送失败: {result.get('error', '未知错误')}")
+
+
+def _verify_2fa_code(session, username, code):
+    """提交二次验证码并返回 errno"""
+    url = "https://jaccount.sjtu.edu.cn/jaccount/2faVerify"
+    resp = session.post(url, data={
+        'account': username,
+        'captcha': code,
+        'trust': 'true',
+    }, headers={'X-Requested-With': 'XMLHttpRequest'})
+    result = resp.json()
+    return result.get('errno', -1)
+
+
+def _handle_2fa(session, response, username, two_fa_cb=None):
+    """
+    处理异地登录二次验证。
+    two_fa_cb 需提供:
+      select_method() -> 'app'/'email'/'sms' 或 None(取消)
+      get_code() -> 6位验证码 或 'r'(重发) 或 None(取消)
+      show_message(msg) -> 显示提示
+    """
+    if two_fa_cb is None:
+        raise RuntimeError("检测到异地登录需要二次验证，请在界面中操作")
+
+    two_fa_cb['show_message']("检测到异地登录，需要二次验证")
+
+    method = two_fa_cb['select_method']()
+    if not method:
+        raise RuntimeError("已取消二次验证")
+
+    _send_2fa_code(session, method)
+    two_fa_cb['show_message']("验证码已发送，请查收")
+
+    for attempt in range(5):
+        code = two_fa_cb['get_code']()
+        if not code:
+            raise RuntimeError("已取消二次验证")
+
+        if code.lower() == 'r':
+            _send_2fa_code(session, method)
+            two_fa_cb['show_message']("验证码已重新发送")
+            continue
+
+        if not code.isdigit() or len(code) != 6:
+            two_fa_cb['show_message']("验证码应为6位数字，请重新输入")
+            continue
+
+        errno = _verify_2fa_code(session, username, code)
+        if errno == 0:
+            sleep(1)
+            # 重新访问完成登录重定向
+            try:
+                session.get(response.url)
+            except Exception:
+                pass
+            return
+        elif errno in (4, 5):
+            _send_2fa_code(session, method)
+            two_fa_cb['show_message']("验证码已过期，已重新发送")
+        else:
+            remaining = 4 - attempt
+            two_fa_cb['show_message'](f"验证码错误，还可重试 {remaining} 次")
+
+    raise RuntimeError("二次验证失败: 超过最大尝试次数")
+
+
+def login(username, password, two_fa_cb=None):
+    session = _create_session()
+
+    url = get_jalogin_from_authorize(
+        session,
+        client_id="9mqzULSXYgUYj5fPOpyL",
+        redirect_uri="https://pe.sjtu.edu.cn/oauth2Login"
+    )
+
+    login_resp = _get_login_page(session, url)
+
+    # 如果直接进入2FA页面
+    if _is_2fa_page(login_resp.text) or _is_2fa_page(login_resp.url):
+        _handle_2fa(session, login_resp, username, two_fa_cb)
+        return session
+
+    login_page = login_resp.text
+
+    captcha_id = re_search(r'img.src = \'captcha\?(.*)\'', login_page) + get_timestamp()  # type: ignore
+    captcha_url = 'https://jaccount.sjtu.edu.cn/jaccount/captcha?' + captcha_id
+
+    _get_captcha(session, captcha_url)
+    captcha_code = _identify_captcha()
+
+    sleep(1)
+
+    res = _post_login_request(session, login_page, username, password, captcha_code)
+
+    # 检查是否触发了二次验证
+    if _is_2fa_page(res.text) or _is_2fa_page(res.url):
+        _handle_2fa(session, res, username, two_fa_cb)
+        return session
+
+    # 检查登录结果
     cookie_names = {c.name for c in session.cookies}
     if 'JAAuthCookie' in cookie_names:
-        return 0
-    else:
-        return -1
+        return session
 
-def login(username, password):
-        session = _create_session()
-
-        url = get_jalogin_from_authorize(
-            session,
-            client_id="9mqzULSXYgUYj5fPOpyL",
-            redirect_uri="https://pe.sjtu.edu.cn/oauth2Login"
-        )
-
-        # 获得页面信息
-        login_page = _get_login_page(session, url)
-
-        # 立刻获得验证码请求路径，避免时间戳过期
-        captcha_id = re_search(r'img.src = \'captcha\?(.*)\'', login_page) + get_timestamp() # type: ignore
-        captcha_url = 'https://jaccount.sjtu.edu.cn/jaccount/captcha?' + captcha_id
-
-        # 下载验证码图片
-        _get_captcha(session, captcha_url)
-        captcha_code = _indentify_captcha()
-
-        # 获取用户名和密码
-        sleep(1)
-        user_info = [username, password]
-
-        # 发起登录请求
-        result = _post_login_request(session, login_page, user_info[0],user_info[1], captcha_code)
-
-        # 判断返回结果
-        if result == 0:
-            return session
+    raise RuntimeError("登录失败，请检查用户名和密码")
