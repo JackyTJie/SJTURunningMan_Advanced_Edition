@@ -1,1 +1,1 @@
-global_version = "3.0.0"
+global_version = "4.0.0"
