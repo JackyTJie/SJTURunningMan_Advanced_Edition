@@ -6,3 +6,12 @@ build/
 dist/
 
 SJTU Sports Uploader.spec
+
+refs/
+.idea/
+.qwen/
+.agents/
+.codex/
+.claude/
+.gemini/
+.cursor/
