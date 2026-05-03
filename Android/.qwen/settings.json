@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir *)",
+      "Bash(./gradlew *)",
+      "Bash(mv *)",
+      "Bash(java *)",
+      "Bash(javac *)"
+    ]
+  },
+  "$version": 3
+}
