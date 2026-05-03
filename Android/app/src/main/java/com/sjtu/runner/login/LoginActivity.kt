@@ -36,30 +36,27 @@ class LoginActivity : Activity() {
                     
                     // Check if login is complete by looking for specific cookies or URL patterns
                     val isLoginComplete = when {
-                        // Case 1: We're on the oauth2Login page (original check)
+                        // Case 1: 跳转到OAuth授权回调页（最核心、最可靠的判断）
                         url?.startsWith("https://pe.sjtu.edu.cn/oauth2Login") == true -> {
                             Log.d(TAG, "Detected oauth2Login page")
                             true
                         }
-                        // Case 2: We have cookies for pe.sjtu.edu.cn (API will use these)
+                        // Case 2: 拿到体育学院的会话Cookie JSESSIONID（API请求必需）
                         !cookies.isNullOrBlank() && cookies.contains("JSESSIONID") -> {
                             Log.d(TAG, "Detected pe.sjtu.edu.cn session cookie")
                             true
                         }
-                        // Case 3: We're redirected to a pe.sjtu.edu.cn page after login
-                        url?.startsWith("https://pe.sjtu.edu.cn") == true && 
-                        !url.contains("oauth2/authorize") && 
-                        !url.contains("jaccount") -> {
+                        // Case 3: 成功跳转到体育学院主站页面（非登录、非授权页）
+                        url?.startsWith("https://pe.sjtu.edu.cn") == true &&
+                                !url.contains("oauth2/authorize") &&
+                                !url.contains("jaccount") -> {
                             Log.d(TAG, "Detected pe.sjtu.edu.cn page after login")
                             true
                         }
-                        // Case 4: We have JAAuthCookie from jaccount
-                        !jaccountCookies.isNullOrBlank() && jaccountCookies.contains("JAAuthCookie") -> {
-                            Log.d(TAG, "Detected JAAuthCookie")
-                            true
-                        }
+                        // ❌ 已删除：仅JAAuthCookie就判定登录完成（导致二次验证提前跳转）
                         else -> false
                     }
+
                     
                     if (isLoginComplete) {
                         Log.d(TAG, "Login complete, finishing activity")
