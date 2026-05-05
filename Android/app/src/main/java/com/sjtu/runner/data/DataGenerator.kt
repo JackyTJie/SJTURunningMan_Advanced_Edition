@@ -30,9 +30,11 @@ object DataGenerator {
         } else 0.0
         log("单圈距离: ${String.format("%.2f", singleLoopDistance)}m，目标: ${targetDistanceM}m")
 
-        val paceMinPerKm = 4.0
-        val totalDurationSec = (paceMinPerKm * 60 * targetDistanceM / 1000.0).roundToInt()
+        // 配速随机化：在4-6分钟/公里范围内随机生成（4-6分配）
+        val randomPaceMinPerKm = (4.0..6.0).random()
+        val totalDurationSec = (randomPaceMinPerKm * 60 * targetDistanceM / 1000.0).roundToInt()
         val targetSpeedMps = targetDistanceM.toDouble() / totalDurationSec
+        log("使用随机配速: ${String.format("%.1f", randomPaceMinPerKm)} 分钟/公里 (${(randomPaceMinPerKm * 60).toInt()} 秒/公里)")
         log("目标速度: ${String.format("%.2f", targetSpeedMps)} m/s")
 
         val adjustedCoords = adjustPath(

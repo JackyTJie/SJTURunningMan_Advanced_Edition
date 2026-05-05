@@ -585,7 +585,7 @@ class SportsUploaderUI(QWidget):
                 "START_LONGITUDE": float(self.config.get("START_LONGITUDE", 121.442938)),
                 "END_LATITUDE": float(self.config.get("END_LATITUDE", 31.0264)),
                 "END_LONGITUDE": float(self.config.get("END_LONGITUDE", 121.4551)),
-                "RUNNING_SPEED_MPS": round(1000.0 / (3.5 * 60), 3),
+                "RUNNING_SPEED_MPS": round(1000.0 / (4.0 * 60), 3),  # 4分配对应的速度，约4.17 m/s
                 "INTERVAL_SECONDS": int(self.config.get("INTERVAL_SECONDS", 3)),
                 "HOST": "pe.sjtu.edu.cn",
                 "UID_URL": "https://pe.sjtu.edu.cn/sports/my/uid",

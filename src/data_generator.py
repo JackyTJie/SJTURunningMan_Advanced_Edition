@@ -835,7 +835,12 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
     # 目标参数
     target_distance_km = config.get('RUN_DISTANCE_KM', 5)  # 从配置获取目标距离，默认5km
     target_distance_m = target_distance_km * 1000  # 转换为米
-    pace_sec_per_km = 4 * 60  # 4 分钟每公里 -> 秒/公里 (对应 15 km/h)
+    
+    # 配速随机化：在4-6分钟/公里范围内随机生成（4-6分配）
+    # 生成随机配速（分钟/公里），范围4.0-6.0
+    random_pace_min_per_km = random.uniform(4.0, 6.0)
+    pace_sec_per_km = random_pace_min_per_km * 60  # 转换为秒/公里
+    
     total_duration_sec = int(round(pace_sec_per_km * target_distance_km))
     interval_seconds = int(config.get('INTERVAL_SECONDS', 3))
     if interval_seconds <= 0:
@@ -843,6 +848,9 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
 
     # 计算目标速度（m/s）
     target_speed_mps = target_distance_m / total_duration_sec if total_duration_sec > 0 else config.get('RUNNING_SPEED_MPS', 4.17)  # 4.17 m/s ≈ 15 km/h
+    
+    # 记录随机配速信息
+    log_output(f"使用随机配速: {random_pace_min_per_km:.1f} 分钟/公里 ({random_pace_min_per_km*60:.0f} 秒/公里)", "info", log_cb)
 
     # 根据目标速度和距离调整路径
     adjusted_coordinates = adjust_path_for_speed(original_coordinates, target_speed_mps, target_distance_m, interval_seconds, log_cb)

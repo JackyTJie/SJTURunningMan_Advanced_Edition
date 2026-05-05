@@ -38,9 +38,11 @@ struct DataGenerator {
             .reduce(0, +)
         log("单圈距离: \(String(format: "%.2f", singleLoopDistance))m，目标: \(targetDistanceM)m")
 
-        let paceMinPerKm = 4.0
-        let totalDurationSec = Int((paceMinPerKm * 60.0 * Double(targetDistanceM) / 1000.0).rounded())
+        // 配速随机化：在4-6分钟/公里范围内随机生成（4-6分配）
+        let randomPaceMinPerKm = Double.random(in: 4.0...6.0)
+        let totalDurationSec = Int((randomPaceMinPerKm * 60.0 * Double(targetDistanceM) / 1000.0).rounded())
         let targetSpeedMps = Double(targetDistanceM) / Double(totalDurationSec)
+        log("使用随机配速: \(String(format: "%.1f", randomPaceMinPerKm)) 分钟/公里 (\(Int(randomPaceMinPerKm * 60)) 秒/公里)")
         log("目标速度: \(String(format: "%.2f", targetSpeedMps)) m/s")
 
         let adjustedCoords = adjustPath(original: corrected,
