@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import ctypes
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
@@ -20,8 +21,31 @@ from src.info_dialog import HelpWidget
 
 RESOURCES_SUB_DIR = "assets"
 
-RESOURCES_FULL_PATH = os.path.join(get_base_path(), RESOURCES_SUB_DIR)
 GITHUB_REPO_URL = "https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition"
+APP_USER_MODEL_ID = "CEQ151.SJTURunningMan.Windows"
+
+
+def get_resource_path(relative_path):
+    """Return a bundled resource path both in source and PyInstaller builds."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(get_base_path(), relative_path)
+
+
+RESOURCES_FULL_PATH = get_resource_path(RESOURCES_SUB_DIR)
+APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM.ico"))
+if not os.path.exists(APP_ICON_PATH):
+    APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM.png"))
+
+
+def set_windows_app_id():
+    """Make Windows taskbar grouping prefer this app's icon."""
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception:
+        return
 
 class WorkerThread(QThread):
     """
@@ -88,7 +112,7 @@ class SportsUploaderUI(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SJTU 校园轻松跑 - Version " + config.global_version)
-        self.setWindowIcon(QIcon(os.path.join(RESOURCES_FULL_PATH, "SJTURM.png")))
+        self.setWindowIcon(QIcon(APP_ICON_PATH))
 
         # 后台线程引用（私有）
         self._thread = None
@@ -100,8 +124,8 @@ class SportsUploaderUI(QWidget):
         self.setup_ui_style()
         self.init_ui()
 
-        self.setGeometry(220, 80, 960, 680)
-        self.setMinimumSize(820, 620)
+        self.setGeometry(140, 60, 1180, 780)
+        self.setMinimumSize(980, 680)
 
         # 根据当前窗口宽度调整内容区域宽度
         self.adjust_content_width(self.width())
@@ -579,8 +603,9 @@ class SportsUploaderUI(QWidget):
         根据给定的窗口宽度，计算并设置 center_widget 的固定宽度。
         """
         # 横向布局需要更宽的内容区，同时保留少量边距。
-        calculated_width = int(min(window_width * 0.96, 1120))
-        calculated_width = max(780, calculated_width)
+        available_width = max(0, window_width - 40)
+        calculated_width = int(min(available_width * 0.98, 1280))
+        calculated_width = max(940, calculated_width)
         self.center_widget.setFixedWidth(calculated_width)
 
     def center_window(self):
@@ -1092,7 +1117,9 @@ class SportsUploaderUI(QWidget):
         return super().eventFilter(watched, event)
 
 if __name__ == "__main__":
+    set_windows_app_id()
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(APP_ICON_PATH))
     ui = SportsUploaderUI()
     ui.show()
     sys.exit(app.exec())
