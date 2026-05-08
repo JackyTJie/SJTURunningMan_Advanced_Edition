@@ -56,5 +56,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets\\SJTURM.png',
+    icon='assets\\SJTURM.ico',
 )
