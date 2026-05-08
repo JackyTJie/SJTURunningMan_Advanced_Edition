@@ -2,13 +2,14 @@ import sys
 import os
 import re
 import ctypes
+import shutil
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
     QSpacerItem, QFileDialog, QDialog, QFrame
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent
+from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize
 from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices
 
 from src.main import run_sports_upload
@@ -20,9 +21,26 @@ import src.config as config
 from src.info_dialog import HelpWidget
 
 RESOURCES_SUB_DIR = "assets"
+ROUTES_SUB_DIR = os.path.join(RESOURCES_SUB_DIR, "Routes")
+USER_ROUTES_DIR_NAME = "Routes"
+CUSTOM_ROUTE_ACTION = "__custom_route_action__"
 
 GITHUB_REPO_URL = "https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition"
+SHUIYUAN_TOPIC_URL = "https://shuiyuan.sjtu.edu.cn/t/topic/421786"
 APP_USER_MODEL_ID = "CEQ151.SJTURunningMan.Windows"
+DISCLAIMER_TEXT = (
+    "本项目仅用于学习、研究和技术测试，主要用于理解运动数据记录与上传相关的技术流程。\n\n"
+    "项目开发者反对任何违反学校规定的使用方式。\n\n"
+    "请在使用前确认自己的行为符合上海交通大学校规及相关法律法规的要求，"
+    "严禁用于伪造运动数据或规避体育锻炼要求。"
+)
+COMMITMENT_TEXT = (
+    "在继续使用本软件前，请认真阅读并作出承诺：\n\n"
+    "1. 我理解本项目仅用于学习、研究和技术测试，主要用于理解运动数据记录与上传相关的技术流程。\n\n"
+    "2. 我理解项目开发者反对任何违反学校规定的使用方式。\n\n"
+    "3. 我承诺在使用前确认自己的行为符合上海交通大学校规及相关法律法规的要求。\n\n"
+    "4. 我承诺不会将本软件用于伪造运动数据、规避体育锻炼要求或其他违规操作。"
+)
 
 
 def get_resource_path(relative_path):
@@ -173,16 +191,21 @@ class SportsUploaderUI(QWidget):
                 background-color: transparent;
             }
 
-            #appSubtitle {
-                color: rgb(100, 116, 139);
-                font-size: 9pt;
-                background-color: transparent;
-            }
-
             #sectionHint {
                 color: rgb(100, 116, 139);
                 font-size: 8pt;
                 background-color: transparent;
+            }
+
+            #warningBox {
+                background-color: rgb(255, 247, 237);
+                color: rgb(124, 45, 18);
+                border: 1px solid rgb(251, 191, 36);
+                border-radius: 8px;
+                padding: 18px;
+                font-size: 10pt;
+                font-weight: 600;
+                line-height: 145%;
             }
             
             /* GroupBox 样式 */
@@ -326,6 +349,13 @@ class SportsUploaderUI(QWidget):
             #stopButton:pressed {
                 background-color: rgb(137, 32, 48);
             }
+            #shuiyuanButton {
+                padding: 6px;
+                min-width: 178px;
+                max-width: 178px;
+                min-height: 42px;
+                max-height: 42px;
+            }
             #githubButton {
                 background-color: rgb(15, 23, 42);
                 color: rgb(255, 255, 255);
@@ -357,6 +387,183 @@ class SportsUploaderUI(QWidget):
 
     def open_github_repo(self):
         QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL))
+
+    def open_shuiyuan_topic(self):
+        QDesktopServices.openUrl(QUrl(SHUIYUAN_TOPIC_URL))
+
+    def get_user_routes_dir(self):
+        return os.path.join(get_base_path(), USER_ROUTES_DIR_NAME)
+
+    def get_unique_route_destination(self, source_path):
+        routes_dir = self.get_user_routes_dir()
+        file_name = os.path.basename(source_path)
+        stem, ext = os.path.splitext(file_name)
+        if not ext:
+            ext = ".txt"
+
+        destination_path = os.path.join(routes_dir, f"{stem}{ext}")
+        counter = 1
+        while os.path.exists(destination_path):
+            destination_path = os.path.join(routes_dir, f"{stem}_{counter}{ext}")
+            counter += 1
+        return destination_path
+
+    def validate_route_file_format(self, file_path):
+        """Validate every non-empty route line is longitude,latitude."""
+        has_line = False
+        with open(file_path, "r", encoding="utf-8") as route_file:
+            for line_number, raw_line in enumerate(route_file, start=1):
+                line = raw_line.strip()
+                if not line:
+                    continue
+
+                has_line = True
+                parts = [part.strip() for part in line.split(",")]
+                if len(parts) != 2:
+                    raise ValueError(f"路线文件第 {line_number} 行格式错误，应为 longitude,latitude。")
+
+                try:
+                    float(parts[0])
+                    float(parts[1])
+                except ValueError:
+                    raise ValueError(f"路线文件第 {line_number} 行包含非数字坐标。")
+
+        if not has_line:
+            raise ValueError("路线文件为空。")
+
+    def get_route_options(self):
+        """Return available route options as (display_name, absolute_path)."""
+        route_options = []
+        base_path = get_base_path()
+
+        user_routes_dir = self.get_user_routes_dir()
+        if os.path.isdir(user_routes_dir):
+            imported_route_files = [
+                os.path.join(user_routes_dir, file_name)
+                for file_name in os.listdir(user_routes_dir)
+                if file_name.lower().endswith(".txt")
+            ]
+            imported_route_files.sort(key=lambda path: os.path.basename(path).lower())
+            for route_path in imported_route_files:
+                route_name = os.path.splitext(os.path.basename(route_path))[0]
+                route_options.append((f"{route_name}（已导入）", route_path))
+
+        user_route_path = os.path.join(base_path, "user.txt")
+        if os.path.exists(user_route_path):
+            route_options.append(("user.txt（自定义路线）", user_route_path))
+
+        routes_dir = get_resource_path(ROUTES_SUB_DIR)
+        if os.path.isdir(routes_dir):
+            route_files = [
+                os.path.join(routes_dir, file_name)
+                for file_name in os.listdir(routes_dir)
+                if file_name.lower().endswith(".txt")
+            ]
+            route_files.sort(
+                key=lambda path: (
+                    0 if os.path.basename(path).lower() == "default.txt" else 1,
+                    os.path.basename(path).lower(),
+                )
+            )
+
+            for route_path in route_files:
+                file_name = os.path.basename(route_path)
+                route_name = os.path.splitext(file_name)[0]
+                display_name = "default（默认）" if file_name.lower() == "default.txt" else route_name
+                route_options.append((display_name, route_path))
+
+        if not route_options:
+            fallback_path = os.path.join(base_path, "default.txt")
+            if os.path.exists(fallback_path):
+                route_options.append(("default（项目根目录）", fallback_path))
+            else:
+                route_options.append(("硬编码默认路线", ""))
+
+        return route_options
+
+    def populate_route_combo(self, select_path=None):
+        self._route_combo_updating = True
+        self.route_combo.clear()
+        self.route_combo.addItem("自定义...", CUSTOM_ROUTE_ACTION)
+        default_index = 1
+        selected_index = None
+        selected_path_norm = os.path.normcase(os.path.abspath(select_path)) if select_path else None
+
+        for index, (display_name, route_path) in enumerate(self.get_route_options()):
+            combo_index = index + 1
+            self.route_combo.addItem(display_name, route_path)
+            route_path_norm = os.path.normcase(os.path.abspath(route_path)) if route_path else ""
+            if selected_path_norm and route_path_norm == selected_path_norm:
+                selected_index = combo_index
+            if os.path.basename(route_path).lower() == "default.txt":
+                default_index = combo_index
+
+        target_index = selected_index if selected_index is not None else min(default_index, self.route_combo.count() - 1)
+        self.route_combo.setCurrentIndex(max(0, target_index))
+        self._last_route_index = self.route_combo.currentIndex()
+        self._route_combo_updating = False
+
+    def restore_previous_route_selection(self):
+        if not hasattr(self, "route_combo"):
+            return
+        previous_index = getattr(self, "_last_route_index", 0)
+        if previous_index < 0 or previous_index >= self.route_combo.count():
+            previous_index = 1 if self.route_combo.count() > 1 else 0
+        self._route_combo_updating = True
+        self.route_combo.setCurrentIndex(previous_index)
+        self._route_combo_updating = False
+
+    def import_custom_route(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择自定义路线文件",
+            get_base_path(),
+            "路线文件 (*.txt)"
+        )
+
+        if not file_path:
+            self.restore_previous_route_selection()
+            return
+
+        if os.path.splitext(file_path)[1].lower() != ".txt":
+            QMessageBox.warning(self, "路线文件无效", "请选择 .txt 路线文件。")
+            self.restore_previous_route_selection()
+            return
+
+        try:
+            from src.data_generator import read_gps_coordinates_from_file
+            self.validate_route_file_format(file_path)
+            coordinates = read_gps_coordinates_from_file(file_path)
+            if len(coordinates) < 2:
+                raise ValueError("路线文件至少需要包含 2 个有效坐标点。")
+
+            user_routes_dir = self.get_user_routes_dir()
+            os.makedirs(user_routes_dir, exist_ok=True)
+
+            source_path = os.path.abspath(file_path)
+            target_dir = os.path.abspath(user_routes_dir)
+            if os.path.normcase(os.path.dirname(source_path)) == os.path.normcase(target_dir):
+                destination_path = source_path
+            else:
+                destination_path = self.get_unique_route_destination(source_path)
+                shutil.copy2(source_path, destination_path)
+
+            self.populate_route_combo(select_path=destination_path)
+            QMessageBox.information(self, "路线导入成功", f"已导入路线：{os.path.basename(destination_path)}")
+        except Exception as e:
+            QMessageBox.warning(self, "路线导入失败", str(e))
+            self.restore_previous_route_selection()
+
+    def on_route_combo_changed(self, index):
+        if getattr(self, "_route_combo_updating", False):
+            return
+
+        route_data = self.route_combo.itemData(index)
+        if route_data == CUSTOM_ROUTE_ACTION:
+            self.import_custom_route()
+            return
+
+        self._last_route_index = index
 
     def init_ui(self):
         top_h_layout = QHBoxLayout()
@@ -400,16 +607,24 @@ class SportsUploaderUI(QWidget):
 
         title_block = QVBoxLayout()
         title_block.setContentsMargins(0, 0, 0, 0)
-        title_block.setSpacing(4)
+        title_block.setSpacing(0)
 
         title_label = QLabel("SJTU 校园轻松跑")
         title_label.setObjectName("appTitle")
-        subtitle_label = QLabel(f"Version {config.global_version} · 轻量桌面版 · 生成记录前请确认日期、时间和路线")
-        subtitle_label.setObjectName("appSubtitle")
-        subtitle_label.setWordWrap(True)
         title_block.addWidget(title_label)
-        title_block.addWidget(subtitle_label)
         header_layout.addLayout(title_block, 1)
+
+        self.shuiyuan_button = QPushButton()
+        self.shuiyuan_button.setObjectName("shuiyuanButton")
+        shuiyuan_icon_path = os.path.join(RESOURCES_FULL_PATH, "shuiyuan_logo.svg")
+        if os.path.exists(shuiyuan_icon_path):
+            self.shuiyuan_button.setIcon(QIcon(shuiyuan_icon_path))
+            self.shuiyuan_button.setIconSize(QSize(128, 128))
+        else:
+            self.shuiyuan_button.setText("水源")
+        self.shuiyuan_button.setToolTip("打开水源社区讨论帖")
+        self.shuiyuan_button.clicked.connect(self.open_shuiyuan_topic)
+        header_layout.addWidget(self.shuiyuan_button)
 
         self.github_button = QPushButton("GitHub")
         self.github_button.setObjectName("githubButton")
@@ -449,11 +664,20 @@ class SportsUploaderUI(QWidget):
         self.status_label = QLabel("状态: 待命")
         status_layout.addWidget(self.status_label)
 
+        self.warning_label = QLabel(DISCLAIMER_TEXT)
+        self.warning_label.setObjectName("warningBox")
+        self.warning_label.setWordWrap(True)
+        self.warning_label.setAlignment(Qt.AlignCenter)
+        self.warning_label.setMinimumHeight(260)
+        self.warning_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        status_layout.addWidget(self.warning_label, 1)
+
         self.log_output_area = QTextEdit()
         self.log_output_area.setReadOnly(True)
         self.log_output_area.setFont(QFont("Monospace", 9))
         self.log_output_area.setMinimumHeight(260)
         self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.log_output_area.setVisible(False)
         status_layout.addWidget(self.log_output_area, 1)
 
         status_group.setLayout(status_layout)
@@ -463,10 +687,11 @@ class SportsUploaderUI(QWidget):
         run_settings_group = QGroupBox("上传设置")
         run_settings_layout = QVBoxLayout()
         run_settings_layout.setContentsMargins(15, 15, 15, 15)
-        run_settings_layout.setSpacing(20)
+        run_settings_layout.setSpacing(14)
 
         # 跑步次数
         days_layout = QVBoxLayout()
+        days_layout.setSpacing(6)
         days_label_layout = QHBoxLayout()
         days_label_layout.addWidget(QLabel("跑步次数:"))
         days_label_layout.addStretch()
@@ -480,12 +705,11 @@ class SportsUploaderUI(QWidget):
         self.run_days_input.setToolTip("要生成的跑步记录数量，最多 30 条。")
         days_input_layout.addWidget(self.run_days_input)
         days_layout.addLayout(days_input_layout)
-        days_layout.addWidget(self.create_hint_label("生成多少条跑步记录。最多 30 条。"))
-
-        run_settings_layout.addLayout(days_layout)
+        days_layout.addWidget(self.create_hint_label("最多 30 条。"))
 
         # 跑步开始时间
         time_layout = QVBoxLayout()
+        time_layout.setSpacing(6)
         time_label_layout = QHBoxLayout()
         time_label_layout.addWidget(QLabel("跑步时间:"))
         time_label_layout.addStretch()
@@ -500,12 +724,19 @@ class SportsUploaderUI(QWidget):
         time_input_layout.addWidget(self.run_time_input)
 
         time_layout.addLayout(time_input_layout)
-        time_layout.addWidget(self.create_hint_label("格式：HH:MM:SS，例如 08:00:00。实际记录会自动前后随机偏移几分钟。"))
+        time_layout.addWidget(self.create_hint_label("格式：HH:MM:SS，实际会随机偏移。"))
 
-        run_settings_layout.addLayout(time_layout)
+        first_settings_row = QHBoxLayout()
+        first_settings_row.setSpacing(14)
+        first_settings_row.addLayout(days_layout, 1)
+        first_settings_row.addLayout(time_layout, 1)
+        first_settings_row.setAlignment(days_layout, Qt.AlignTop)
+        first_settings_row.setAlignment(time_layout, Qt.AlignTop)
+        run_settings_layout.addLayout(first_settings_row)
 
         # 结束日期
         date_layout = QVBoxLayout()
+        date_layout.setSpacing(6)
         date_label_layout = QHBoxLayout()
         date_label_layout.addWidget(QLabel("结束日期:"))
         date_label_layout.addStretch()
@@ -522,12 +753,11 @@ class SportsUploaderUI(QWidget):
         date_input_layout.addWidget(self.date_input)
 
         date_layout.addLayout(date_input_layout)
-        date_layout.addWidget(self.create_hint_label("格式：YYYY-MM-DD，例如 2026-05-07。会以这天作为最新一条记录，向前生成。"))
-
-        run_settings_layout.addLayout(date_layout)
+        date_layout.addWidget(self.create_hint_label("格式：YYYY-MM-DD，作为最新一条记录。"))
 
         # 跑步距离
         distance_layout = QVBoxLayout()
+        distance_layout.setSpacing(6)
         distance_label_layout = QHBoxLayout()
         distance_label_layout.addWidget(QLabel("跑步距离:"))
         distance_label_layout.addStretch()
@@ -541,9 +771,32 @@ class SportsUploaderUI(QWidget):
         self.run_distance_input.setToolTip("每条记录的目标跑步距离，最多 4km。")
         distance_input_layout.addWidget(self.run_distance_input)
         distance_layout.addLayout(distance_input_layout)
-        distance_layout.addWidget(self.create_hint_label("单位：km。最多 4km，例如 3 或 4。"))
+        distance_layout.addWidget(self.create_hint_label("单位 km，最多 4km。"))
 
-        run_settings_layout.addLayout(distance_layout)
+        second_settings_row = QHBoxLayout()
+        second_settings_row.setSpacing(14)
+        second_settings_row.addLayout(date_layout, 1)
+        second_settings_row.addLayout(distance_layout, 1)
+        second_settings_row.setAlignment(date_layout, Qt.AlignTop)
+        second_settings_row.setAlignment(distance_layout, Qt.AlignTop)
+        run_settings_layout.addLayout(second_settings_row)
+
+        # 预设路线
+        route_layout = QVBoxLayout()
+        route_layout.setSpacing(6)
+        route_label_layout = QHBoxLayout()
+        route_label_layout.addWidget(QLabel("预设路线:"))
+        route_label_layout.addStretch()
+        route_layout.addLayout(route_label_layout)
+
+        self.route_combo = QComboBox()
+        self.route_combo.setToolTip("选择本次生成记录使用的路线。")
+        self.populate_route_combo()
+        self.route_combo.currentIndexChanged.connect(self.on_route_combo_changed)
+        route_layout.addWidget(self.route_combo)
+        route_layout.addWidget(self.create_hint_label("可选择内置路线，或选择“自定义...”导入 txt 路线文件。"))
+
+        run_settings_layout.addLayout(route_layout)
 
         run_settings_group.setLayout(run_settings_layout)
         right_column.addWidget(run_settings_group)
@@ -567,7 +820,7 @@ class SportsUploaderUI(QWidget):
         primary_button_layout.addWidget(self.stop_button)
 
         self.route_button = QPushButton("设计/更新路线")
-        self.route_button.setToolTip("未设置自定义路线时，将使用默认路线。")
+        self.route_button.setToolTip("打开路线规划器生成 txt；生成后在“预设路线”中选择“自定义...”导入。")
         self.route_button.clicked.connect(self.open_route_generator)
         secondary_button_layout.addWidget(self.route_button)
 
@@ -579,7 +832,7 @@ class SportsUploaderUI(QWidget):
         action_button_layout.addLayout(secondary_button_layout)
 
         right_column.addLayout(action_button_layout)
-        right_column.addWidget(self.create_hint_label("未设置自定义路线时会使用默认路线；需要更换路线时点击“设计/更新路线”。"))
+        right_column.addWidget(self.create_hint_label("需要新路线时点击“设计/更新路线”，生成 txt 后通过“预设路线”里的“自定义...”导入。"))
         right_column.addStretch(1)
 
         content_layout.addLayout(left_column, 5)
@@ -653,6 +906,15 @@ class SportsUploaderUI(QWidget):
             if run_distance_km.is_integer():
                 run_distance_km = int(run_distance_km)
 
+            selected_route_path = ""
+            selected_route_name = ""
+            if hasattr(self, "route_combo"):
+                selected_route_path = self.route_combo.currentData() or ""
+                selected_route_name = self.route_combo.currentText().strip()
+                if selected_route_path == CUSTOM_ROUTE_ACTION:
+                    selected_route_path = ""
+                    selected_route_name = ""
+
             current_config = {
                 "USER_ID": username,
                 "PASSWORD": password,
@@ -673,6 +935,10 @@ class SportsUploaderUI(QWidget):
                 "POINT_RULE_URL": "https://pe.sjtu.edu.cn/api/running/point-rule",  # Fixed URL
                 "UPLOAD_URL": "https://pe.sjtu.edu.cn/api/running/result/upload"
             }
+
+            if selected_route_path:
+                current_config["ROUTE_PATH"] = selected_route_path
+                current_config["ROUTE_NAME"] = selected_route_name
 
             # Add start date from direct input (the input is always filled with a default value)
             start_date_text = self.date_input.text().strip()
@@ -776,7 +1042,103 @@ class SportsUploaderUI(QWidget):
         """二次验证：显示提示信息"""
         self.log_output_text(msg, "info")
 
+    def show_commitment_dialog(self):
+        """Require an explicit compliance commitment before the main window is usable."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("使用承诺书")
+        dialog.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
+        dialog.setWindowModality(Qt.ApplicationModal)
+        dialog.setMinimumWidth(560)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: rgb(246, 248, 251);
+            }
+            QLabel#commitmentTitle {
+                color: rgb(15, 23, 42);
+                font-size: 15pt;
+                font-weight: 700;
+                background-color: transparent;
+            }
+            QLabel#commitmentBody {
+                background-color: rgb(255, 247, 237);
+                color: rgb(124, 45, 18);
+                border: 1px solid rgb(251, 191, 36);
+                border-radius: 8px;
+                padding: 16px;
+                font-size: 10pt;
+                line-height: 145%;
+            }
+            QCheckBox {
+                color: rgb(51, 65, 85);
+                font-size: 10pt;
+                background-color: transparent;
+            }
+            QPushButton {
+                border: 1px solid rgb(203, 213, 225);
+                border-radius: 6px;
+                padding: 9px 16px;
+                background-color: white;
+                color: rgb(51, 65, 85);
+                font-size: 10pt;
+            }
+            QPushButton#commitmentAcceptButton {
+                background-color: rgb(42, 111, 151);
+                border-color: rgb(42, 111, 151);
+                color: white;
+                font-weight: 600;
+            }
+            QPushButton#commitmentAcceptButton:disabled {
+                background-color: rgb(203, 213, 225);
+                border-color: rgb(203, 213, 225);
+                color: rgb(100, 116, 139);
+            }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 20)
+        layout.setSpacing(16)
+
+        title_label = QLabel("使用承诺书")
+        title_label.setObjectName("commitmentTitle")
+        layout.addWidget(title_label)
+
+        body_label = QLabel(COMMITMENT_TEXT)
+        body_label.setObjectName("commitmentBody")
+        body_label.setWordWrap(True)
+        body_label.setMinimumHeight(220)
+        layout.addWidget(body_label)
+
+        commitment_checkbox = QCheckBox("我已阅读以上内容，并承诺不会将本软件用于任何违规操作。")
+        layout.addWidget(commitment_checkbox)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        exit_button = QPushButton("退出")
+        exit_button.clicked.connect(dialog.reject)
+        button_layout.addWidget(exit_button)
+
+        accept_button = QPushButton("我承诺，进入软件")
+        accept_button.setObjectName("commitmentAcceptButton")
+        accept_button.setEnabled(False)
+        accept_button.clicked.connect(dialog.accept)
+        accept_button.setDefault(True)
+        commitment_checkbox.toggled.connect(accept_button.setEnabled)
+        button_layout.addWidget(accept_button)
+
+        layout.addLayout(button_layout)
+
+        return dialog.exec() == QDialog.Accepted
+
+    def show_program_log(self):
+        """Switch the status area from the startup warning to runtime logs."""
+        if hasattr(self, "warning_label"):
+            self.warning_label.setVisible(False)
+        if hasattr(self, "log_output_area"):
+            self.log_output_area.setVisible(True)
+
     def start_upload(self):
+        self.show_program_log()
         self.log_output_area.clear()
         self.progress_bar.setValue(0)
         self.status_label.setText("状态: 准备中...")
@@ -826,23 +1188,26 @@ class SportsUploaderUI(QWidget):
             from src.data_generator import read_gps_coordinates_from_file, calculate_route_distance
             import os
             
-            # Only look in the project root directory for route files
             from utils.auxiliary_util import get_base_path
-            # Use the base path which works for both compiled and non-compiled versions
             base_path = get_base_path()
-            user_loc_path = os.path.join(base_path, 'user.txt')
-            default_loc_path = os.path.join(base_path, 'default.txt')
+            route_path = current_config_to_send.get("ROUTE_PATH")
 
-            if os.path.exists(user_loc_path):
-                route_path = user_loc_path
-            else:
+            if not route_path:
+                user_loc_path = os.path.join(base_path, 'user.txt')
+                default_loc_path = os.path.join(base_path, 'default.txt')
                 route_path = default_loc_path
-                # Check if default.txt exists
-                if not os.path.exists(route_path):
-                    raise Exception(f"用户路线文件不存在: {user_loc_path} 和 {route_path} 都不存在")
+                if os.path.exists(user_loc_path):
+                    route_path = user_loc_path
+                elif not os.path.exists(route_path):
+                    route_path = ""
+
+            if not route_path or not os.path.exists(route_path):
+                raise Exception(f"当前路线文件不存在: {route_path or '未选择路线文件'}")
 
             route_coordinates = read_gps_coordinates_from_file(route_path)
             route_distance = calculate_route_distance(route_coordinates)
+            if current_config_to_send.get("ROUTE_NAME"):
+                self.log_output_text(f"当前选择路线: {current_config_to_send['ROUTE_NAME']}", "info")
             target_distance_m = current_config_to_send.get('RUN_DISTANCE_KM', 5) * 1000  # Convert to meters
             
             if route_distance > target_distance_m:
@@ -1060,9 +1425,9 @@ class SportsUploaderUI(QWidget):
                                     "此功能将启动路线规划器，您可以：\n\n"
                                     "1. 在浏览器中打开百度地图\n"
                                     "2. 点击地图采集坐标点形成路线\n"
-                                    "3. 点击\"保存路线\"按钮下载user.txt文件\n"
-                                    "4. 将user.txt文件保存到项目根目录\n\n"
-                                    "注意：user.txt将成为新的默认路线文件\n"
+                                    "3. 点击\"下载路线 txt\"保存路线文件\n"
+                                    "4. 回到软件，在\"预设路线\"中选择\"自定义...\"导入该 txt\n\n"
+                                    "导入后路线会复制到软件旁的 Routes 文件夹，并在重启后继续保留。\n"
                                     "是否现在开始？",
                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                     QMessageBox.StandardButton.Yes)
@@ -1076,26 +1441,21 @@ class SportsUploaderUI(QWidget):
                     QMessageBox.information(self, "路线规划器", 
                                         "路线规划器已在浏览器中打开！\n\n"
                                         "请在地图上点击选择路径坐标点，\n"
-                                        "点击\"保存路线\"按钮将下载user.txt文件，\n"
-                                        "请将user.txt保存到项目根目录以替换默认路线。")
+                                        "点击\"下载路线 txt\"保存路线文件。\n\n"
+                                        "下载完成后回到本软件，在\"预设路线\"下拉菜单中选择\"自定义...\"，\n"
+                                        "然后导入刚刚下载的 txt 文件。")
                 except Exception as e:
                     QMessageBox.critical(self, "错误", f"生成路线规划器失败：\n{str(e)}")
             else:
-                # Check if user.txt exists
-                from utils.auxiliary_util import get_base_path
-                base_path = get_base_path()
-                user_txt_path = os.path.join(base_path, 'user.txt')
-                default_txt_path = os.path.join(base_path, 'default.txt') 
-                
-                if os.path.exists(user_txt_path):
-                    QMessageBox.information(self, "当前路线", 
-                                        "将使用当前路线文件：user.txt\n\n"
-                                        "如需修改路线，请选择\"设计/更新路线\"按钮并创建新路线。")
-                else:
-                    QMessageBox.information(self, "默认路线", 
-                                        "将使用默认路线文件：default.txt\n\n"
-                                        "如需修改路线，请选择\"设计/更新路线\"按钮并创建自定义路线。")
-                    
+                selected_route = "未选择"
+                if hasattr(self, "route_combo") and self.route_combo.currentData() != CUSTOM_ROUTE_ACTION:
+                    selected_route = self.route_combo.currentText().strip() or selected_route
+
+                QMessageBox.information(self, "当前路线",
+                                    f"当前选择路线：{selected_route}\n\n"
+                                    "如已有 txt 路线文件，可直接在\"预设路线\"中选择\"自定义...\"导入。\n"
+                                    "如需重新设计路线，再点击\"设计/更新路线\"打开规划器。")
+
         except Exception as e:
             QMessageBox.critical(self, "错误", f"打开路线规划器时出错：\n{str(e)}")
 
@@ -1121,5 +1481,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(APP_ICON_PATH))
     ui = SportsUploaderUI()
+    if not ui.show_commitment_dialog():
+        sys.exit(0)
     ui.show()
     sys.exit(app.exec())

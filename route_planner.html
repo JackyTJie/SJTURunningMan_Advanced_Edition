@@ -97,11 +97,11 @@
 <body>
     <div id="info">
         <h3>🗺️ 路线规划器</h3>
-        <p>点击地图任意位置采集坐标点，形成跑步路线</p>
+        <p>点击地图任意位置采集坐标点，形成跑步路线。下载 txt 后，回到软件的“预设路线”下拉菜单选择“自定义...”导入。</p>
 
         <div class="control-group">
             <button onclick="clearAllMarkers()" class="clear">清空所有点</button>
-            <button onclick="exportCoordinates()" class="save">保存路线</button>
+            <button onclick="exportCoordinates()" class="save">下载路线 txt</button>
         </div>
 
         <div class="success" id="status">地图加载中...</div>
@@ -234,11 +234,11 @@
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
-            a.download = 'user.txt';
+            a.download = 'custom_route.txt';
             document.body.appendChild(a);
             
-            // Show instructions to save in project folder
-            statusDiv.innerHTML = '✓ 点击下面按钮下载user.txt，<br/>请将文件保存到项目根目录！ (' + coordinates.length + '个点)';
+            // Show import instructions for the desktop UI.
+            statusDiv.innerHTML = '✓ 已下载 custom_route.txt。<br/>请回到软件，在“预设路线”中选择“自定义...”导入。 (' + coordinates.length + '个点)';
             statusDiv.className = "success";
             
             // Programmatically click the link
