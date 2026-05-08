@@ -5,9 +5,9 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
-    QSpacerItem, QFileDialog, QDialog
+    QSpacerItem, QFileDialog, QDialog, QFrame
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, QDate, Qt, QUrl, QEvent
+from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent
 from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices
 
 from src.main import run_sports_upload
@@ -21,6 +21,7 @@ from src.info_dialog import HelpWidget
 RESOURCES_SUB_DIR = "assets"
 
 RESOURCES_FULL_PATH = os.path.join(get_base_path(), RESOURCES_SUB_DIR)
+GITHUB_REPO_URL = "https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition"
 
 class WorkerThread(QThread):
     """
@@ -99,8 +100,8 @@ class SportsUploaderUI(QWidget):
         self.setup_ui_style()
         self.init_ui()
 
-        self.setGeometry(300, 50, 520, 750)
-        self.setMinimumSize(520, 750)
+        self.setGeometry(220, 80, 960, 680)
+        self.setMinimumSize(820, 620)
 
         # 根据当前窗口宽度调整内容区域宽度
         self.adjust_content_width(self.width())
@@ -112,7 +113,7 @@ class SportsUploaderUI(QWidget):
 
     def setup_ui_style(self):
         palette = self.palette()
-        palette.setColor(QPalette.Window, QColor(255, 255, 255))
+        palette.setColor(QPalette.Window, QColor(246, 248, 251))
         palette.setColor(QPalette.WindowText, QColor(51, 51, 51))
         palette.setColor(QPalette.Base, QColor(255, 255, 255))
         palette.setColor(QPalette.AlternateBase, QColor(255, 255, 255))
@@ -130,9 +131,34 @@ class SportsUploaderUI(QWidget):
         self.setStyleSheet("""
             /* 基础设置 */
             QWidget {
-                background-color: rgb(255, 255, 255);
-                color: rgb(51, 51, 51);
+                background-color: rgb(246, 248, 251);
+                color: rgb(34, 45, 57);
                 font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+            }
+
+            #appHeader {
+                background-color: rgb(255, 255, 255);
+                border: 1px solid rgb(225, 231, 238);
+                border-radius: 8px;
+            }
+
+            #appTitle {
+                color: rgb(26, 36, 48);
+                font-size: 15pt;
+                font-weight: 700;
+                background-color: transparent;
+            }
+
+            #appSubtitle {
+                color: rgb(100, 116, 139);
+                font-size: 9pt;
+                background-color: transparent;
+            }
+
+            #sectionHint {
+                color: rgb(100, 116, 139);
+                font-size: 8pt;
+                background-color: transparent;
             }
             
             /* GroupBox 样式 */
@@ -140,38 +166,39 @@ class SportsUploaderUI(QWidget):
                 font-size: 10pt;
                 font-weight: bold;
                 margin-top: 10px;
-                border: 1px solid rgb(220, 220, 220);
-                border-radius: 6px;
+                border: 1px solid rgb(225, 231, 238);
+                border-radius: 8px;
                 padding: 15px;
-                color: rgb(74, 144, 226);
-                background-color: rgb(248, 249, 250);
+                color: rgb(42, 111, 151);
+                background-color: rgb(255, 255, 255);
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
                 padding: 0 5px 0 5px;
-                color: rgb(74, 144, 226);
-                background-color: rgb(255, 255, 255);
+                color: rgb(42, 111, 151);
+                background-color: rgb(246, 248, 251);
             }
             
             /* 确保所有标签和输入框可见 */
             QLabel {
-                color: rgb(51, 51, 51);
+                color: rgb(34, 45, 57);
                 background-color: transparent;
                 font-size: 9pt;
             }
             
             QLineEdit, QComboBox, QDateTimeEdit {
                 background-color: rgb(255, 255, 255);
-                border: 1px solid rgb(204, 204, 204);
-                border-radius: 4px;
+                border: 1px solid rgb(203, 213, 225);
+                border-radius: 6px;
                 padding: 8px;
-                color: rgb(51, 51, 51);
+                color: rgb(30, 41, 59);
                 font-size: 9pt;
+                min-height: 20px;
             }
             
             QLineEdit:focus, QComboBox:focus {
-                border: 1px solid rgb(74, 144, 226);
+                border: 1px solid rgb(42, 111, 151);
             }
             
             QComboBox::drop-down {
@@ -179,50 +206,50 @@ class SportsUploaderUI(QWidget):
                 subcontrol-position: top right;
                 width: 20px;
                 border-left-width: 1px;
-                border-left-color: rgb(204, 204, 204);
+                border-left-color: rgb(203, 213, 225);
                 border-left-style: solid;
-                border-top-right-radius: 4px;
-                border-bottom-right-radius: 4px;
+                border-top-right-radius: 6px;
+                border-bottom-right-radius: 6px;
             }
             QPushButton {
                 background-color: rgb(255, 255, 255);
-                color: rgb(51, 51, 51);
-                border: 1px solid rgb(204, 204, 204);
-                border-radius: 4px;
+                color: rgb(30, 41, 59);
+                border: 1px solid rgb(203, 213, 225);
+                border-radius: 6px;
                 padding: 8px 16px;
                 min-height: 24px;
                 max-height: 36px;
             }
             QPushButton:hover {
-                border: 1px solid rgb(74, 144, 226);
-                background-color: rgb(250, 250, 250);
+                border: 1px solid rgb(42, 111, 151);
+                background-color: rgb(248, 251, 253);
             }
             QPushButton:pressed {
-                background-color: rgb(240, 240, 240);
+                background-color: rgb(238, 243, 247);
             }
             QPushButton:disabled {
-                background-color: rgb(255, 255, 255);
-                color: rgb(180, 180, 180);
-                border: 1px solid rgb(230, 230, 230);
+                background-color: rgb(248, 250, 252);
+                color: rgb(148, 163, 184);
+                border: 1px solid rgb(226, 232, 240);
             }
             QProgressBar {
-                border: 1px solid rgb(220, 220, 220);
-                border-radius: 4px;
+                border: 1px solid rgb(225, 231, 238);
+                border-radius: 6px;
                 text-align: center;
                 background-color: rgb(255, 255, 255);
-                color: rgb(51, 51, 51);
+                color: rgb(30, 41, 59);
                 max-height: 20px;
             }
             QProgressBar::chunk {
-                background-color: rgb(74, 144, 226);
-                border-radius: 4px;
+                background-color: rgb(42, 111, 151);
+                border-radius: 6px;
             }
             QTextEdit {
-                background-color: rgb(245, 245, 247);
-                border: 1px solid rgb(220, 220, 220);
-                border-radius: 4px;
+                background-color: rgb(250, 252, 254);
+                border: 1px solid rgb(225, 231, 238);
+                border-radius: 6px;
                 padding: 8px;
-                color: rgb(51, 51, 51);
+                color: rgb(30, 41, 59);
             }
             QScrollArea {
                 border: none;
@@ -249,41 +276,63 @@ class SportsUploaderUI(QWidget):
             QFormLayout QLabel {
                 padding-top: 8px;
                 padding-bottom: 8px;
-                color: rgb(102, 102, 102);
+                color: rgb(71, 85, 105);
             }
             #startButton {
-                background-color: rgb(76, 175, 80);
+                background-color: rgb(36, 126, 90);
                 color: white;
-                border: 1px solid rgb(76, 175, 80);
+                border: 1px solid rgb(36, 126, 90);
             }
             #startButton:hover {
-                background-color: rgb(67, 160, 71);
-                border: 1px solid rgb(67, 160, 71);
+                background-color: rgb(31, 111, 79);
+                border: 1px solid rgb(31, 111, 79);
             }
             #startButton:pressed {
-                background-color: rgb(56, 142, 60);
+                background-color: rgb(25, 92, 66);
             }
             #stopButton {
-                background-color: rgb(220, 53, 69);
+                background-color: rgb(197, 48, 69);
                 color: white;
-                border: 1px solid rgb(220, 53, 69);
+                border: 1px solid rgb(197, 48, 69);
             }
             #stopButton:hover {
-                background-color: rgb(179, 43, 56);
-                border: 1px solid rgb(179, 43, 56);
+                background-color: rgb(167, 40, 58);
+                border: 1px solid rgb(167, 40, 58);
             }
             #stopButton:pressed {
-                background-color: rgb(140, 34, 44);
+                background-color: rgb(137, 32, 48);
+            }
+            #githubButton {
+                background-color: rgb(15, 23, 42);
+                color: rgb(255, 255, 255);
+                border: 1px solid rgb(15, 23, 42);
+                font-weight: 600;
+            }
+            #githubButton:hover {
+                background-color: rgb(30, 41, 59);
+                border: 1px solid rgb(30, 41, 59);
+            }
+            #githubButton:pressed {
+                background-color: rgb(2, 6, 23);
             }
             QLabel#getCookieLink {
-                color: rgb(74, 144, 226);
+                color: rgb(42, 111, 151);
                 text-decoration: underline;
                 padding: 0;
             }
             QLabel#getCookieLink:hover {
-                color: rgb(52, 120, 198);
+                color: rgb(34, 91, 125);
             }
         """)
+
+    def create_hint_label(self, text):
+        label = QLabel(text)
+        label.setObjectName("sectionHint")
+        label.setWordWrap(True)
+        return label
+
+    def open_github_repo(self):
+        QDesktopServices.openUrl(QUrl(GITHUB_REPO_URL))
 
     def init_ui(self):
         top_h_layout = QHBoxLayout()
@@ -307,6 +356,47 @@ class SportsUploaderUI(QWidget):
 
         main_layout.addWidget(self.scroll_area)
 
+        content_layout = QHBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+
+        left_column = QVBoxLayout()
+        left_column.setContentsMargins(0, 0, 0, 0)
+        left_column.setSpacing(15)
+
+        right_column = QVBoxLayout()
+        right_column.setContentsMargins(0, 0, 0, 0)
+        right_column.setSpacing(15)
+
+        header = QFrame()
+        header.setObjectName("appHeader")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(16, 14, 16, 14)
+        header_layout.setSpacing(12)
+
+        title_block = QVBoxLayout()
+        title_block.setContentsMargins(0, 0, 0, 0)
+        title_block.setSpacing(4)
+
+        title_label = QLabel("SJTU 校园轻松跑")
+        title_label.setObjectName("appTitle")
+        subtitle_label = QLabel(f"Version {config.global_version} · 轻量桌面版 · 生成记录前请确认日期、时间和路线")
+        subtitle_label.setObjectName("appSubtitle")
+        subtitle_label.setWordWrap(True)
+        title_block.addWidget(title_label)
+        title_block.addWidget(subtitle_label)
+        header_layout.addLayout(title_block, 1)
+
+        self.github_button = QPushButton("GitHub")
+        self.github_button.setObjectName("githubButton")
+        github_icon_path = os.path.join(RESOURCES_FULL_PATH, "github-mark.svg")
+        if os.path.exists(github_icon_path):
+            self.github_button.setIcon(QIcon(github_icon_path))
+        self.github_button.setToolTip("打开项目 GitHub 仓库")
+        self.github_button.clicked.connect(self.open_github_repo)
+        header_layout.addWidget(self.github_button)
+        left_column.addWidget(header)
+
         user_group = QGroupBox("用户配置")
         user_form_layout = QFormLayout()
         user_form_layout.setVerticalSpacing(15)
@@ -321,7 +411,29 @@ class SportsUploaderUI(QWidget):
         user_form_layout.addRow("用户名:", self.username_input)
         user_form_layout.addRow("密码:", self.password_input)
         user_group.setLayout(user_form_layout)
-        scroll_layout.addWidget(user_group)
+        left_column.addWidget(user_group)
+
+        status_group = QGroupBox("程序状态")
+        status_layout = QVBoxLayout()
+        status_layout.setContentsMargins(15, 15, 15, 15)
+        status_layout.setSpacing(12)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setValue(0)
+        status_layout.addWidget(self.progress_bar)
+
+        self.status_label = QLabel("状态: 待命")
+        status_layout.addWidget(self.status_label)
+
+        self.log_output_area = QTextEdit()
+        self.log_output_area.setReadOnly(True)
+        self.log_output_area.setFont(QFont("Monospace", 9))
+        self.log_output_area.setMinimumHeight(260)
+        self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        status_layout.addWidget(self.log_output_area, 1)
+
+        status_group.setLayout(status_layout)
+        left_column.addWidget(status_group, 1)
 
         # 添加运行次数和时间选择组件
         run_settings_group = QGroupBox("上传设置")
@@ -329,32 +441,26 @@ class SportsUploaderUI(QWidget):
         run_settings_layout.setContentsMargins(15, 15, 15, 15)
         run_settings_layout.setSpacing(20)
 
-        # 运行次数选择 - 天数 (垂直布局)
+        # 跑步次数
         days_layout = QVBoxLayout()
         days_label_layout = QHBoxLayout()
-        days_label_layout.addWidget(QLabel("上传天数:"))
+        days_label_layout.addWidget(QLabel("跑步次数:"))
         days_label_layout.addStretch()
         days_layout.addLayout(days_label_layout)
 
         days_input_layout = QHBoxLayout()
-        self.run_days_combo = QComboBox()
-        self.run_days_combo.addItems(["自定义", "1", "5", "10", "15", "20", "25"])
-        self.run_days_combo.setCurrentIndex(1)  # 默认选择1天
-        days_input_layout.addWidget(self.run_days_combo)
-
-        # 自定义天数输入框（默认隐藏）
-        self.custom_days_input = QLineEdit()
-        self.custom_days_input.setPlaceholderText("输入自定义天数")
-        self.custom_days_input.setVisible(False)  # 默认隐藏
-        days_input_layout.addWidget(self.custom_days_input)
+        self.run_days_input = QLineEdit()
+        self.run_days_input.setText("1")
+        self.run_days_input.setPlaceholderText("正整数，最多 30")
+        self.run_days_input.setMaxLength(2)
+        self.run_days_input.setToolTip("要生成的跑步记录数量，最多 30 条。")
+        days_input_layout.addWidget(self.run_days_input)
         days_layout.addLayout(days_input_layout)
+        days_layout.addWidget(self.create_hint_label("生成多少条跑步记录。最多 30 条。"))
 
         run_settings_layout.addLayout(days_layout)
 
-        # 连接天数下拉框变化事件
-        self.run_days_combo.currentTextChanged.connect(self.on_run_days_changed)
-
-        # 运行时间选择 - 时间 (垂直布局)
+        # 跑步开始时间
         time_layout = QVBoxLayout()
         time_label_layout = QHBoxLayout()
         time_label_layout.addWidget(QLabel("跑步时间:"))
@@ -362,52 +468,41 @@ class SportsUploaderUI(QWidget):
         time_layout.addLayout(time_label_layout)
 
         time_input_layout = QHBoxLayout()
-        self.run_time_combo = QComboBox()
-        # Add "Custom" option for precise time selection at the top
-        self.run_time_combo.addItem("自定义时间 (HH:MM:SS)")
-
-        # Add hours from 6 to 23 (6:00 AM to 11:00 PM) - just hour intervals
-        for hour in range(6, 24):  # 6 AM to 11 PM (23:00)
-            self.run_time_combo.addItem(f"{hour:02d}:00")
-
-        # Default to 8:00 AM (index 3: custom option at index 0, then 6:00, 7:00, 8:00 at index 2+1=3)
-        default_index = 8 - 6 + 1  # 8 AM minus 6 AM plus 1 for the custom option at the beginning
-        self.run_time_combo.setCurrentIndex(default_index)
-        time_input_layout.addWidget(self.run_time_combo)
-
-        # Custom time input layout (initially hidden)
-        self.custom_time_input = QLineEdit()
-        self.custom_time_input.setPlaceholderText("HH:MM:SS (例如: 08:30:45, 24小时制)")
-        self.custom_time_input.setVisible(False)  # Initially hidden
-        time_input_layout.addWidget(self.custom_time_input)
+        self.run_time_input = QLineEdit()
+        self.run_time_input.setText("08:00:00")
+        self.run_time_input.setMaxLength(8)
+        self.run_time_input.setPlaceholderText("HH:MM:SS，例如 08:00:00")
+        self.run_time_input.setToolTip("记录的基础开始时间；实际生成时会自动加入随机偏移。")
+        time_input_layout.addWidget(self.run_time_input)
 
         time_layout.addLayout(time_input_layout)
+        time_layout.addWidget(self.create_hint_label("格式：HH:MM:SS，例如 08:00:00。实际记录会自动前后随机偏移几分钟。"))
 
         run_settings_layout.addLayout(time_layout)
 
-        # Connect time combo change to show/hide custom time input
-        self.run_time_combo.currentTextChanged.connect(self.on_run_time_changed)
-
-        # 运行日期选择 - 日期 (垂直布局)
+        # 结束日期
         date_layout = QVBoxLayout()
         date_label_layout = QHBoxLayout()
-        date_label_layout.addWidget(QLabel("开始日期:"))
+        date_label_layout.addWidget(QLabel("结束日期:"))
         date_label_layout.addStretch()
         date_layout.addLayout(date_label_layout)
 
         date_input_layout = QHBoxLayout()
-        self.date_input = QLineEdit()
         from datetime import datetime, timedelta
         yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-        self.date_input.setText(yesterday)  # 默认显示昨天的日期
-        self.date_input.setPlaceholderText("YYYY-MM-DD (例如: " + yesterday + ")")
+        self.date_input = QLineEdit()
+        self.date_input.setText(yesterday)
+        self.date_input.setMaxLength(10)
+        self.date_input.setPlaceholderText("YYYY-MM-DD，例如 2026-05-07")
+        self.date_input.setToolTip("最新一条记录的日期；程序会从这一天向前生成记录。")
         date_input_layout.addWidget(self.date_input)
 
         date_layout.addLayout(date_input_layout)
+        date_layout.addWidget(self.create_hint_label("格式：YYYY-MM-DD，例如 2026-05-07。会以这天作为最新一条记录，向前生成。"))
 
         run_settings_layout.addLayout(date_layout)
 
-        # 运行距离选择
+        # 跑步距离
         distance_layout = QVBoxLayout()
         distance_label_layout = QHBoxLayout()
         distance_label_layout.addWidget(QLabel("跑步距离:"))
@@ -415,74 +510,61 @@ class SportsUploaderUI(QWidget):
         distance_layout.addLayout(distance_label_layout)
 
         distance_input_layout = QHBoxLayout()
-        self.run_distance_combo = QComboBox()
-        # Add distances from 1 to 5 km
-        for distance in range(1, 6):  # 1 to 5 km
-            self.run_distance_combo.addItem(f"{distance} km")
-
-        self.run_distance_combo.setCurrentIndex(4)  # 默认选择5 km (index 4)
-        distance_input_layout.addWidget(self.run_distance_combo)
+        self.run_distance_input = QLineEdit()
+        self.run_distance_input.setText("4")
+        self.run_distance_input.setPlaceholderText("1-4，单位 km")
+        self.run_distance_input.setMaxLength(3)
+        self.run_distance_input.setToolTip("每条记录的目标跑步距离，最多 4km。")
+        distance_input_layout.addWidget(self.run_distance_input)
         distance_layout.addLayout(distance_input_layout)
+        distance_layout.addWidget(self.create_hint_label("单位：km。最多 4km，例如 3 或 4。"))
 
         run_settings_layout.addLayout(distance_layout)
 
         run_settings_group.setLayout(run_settings_layout)
-        scroll_layout.addWidget(run_settings_group)
+        right_column.addWidget(run_settings_group)
 
-        action_button_layout = QHBoxLayout()
-        action_button_layout.setSpacing(12)
-        self.start_button = QPushButton("一键跑步")
+        action_button_layout = QVBoxLayout()
+        action_button_layout.setSpacing(10)
+        primary_button_layout = QHBoxLayout()
+        primary_button_layout.setSpacing(12)
+        secondary_button_layout = QHBoxLayout()
+        secondary_button_layout.setSpacing(12)
+
+        self.start_button = QPushButton("开始生成并上传")
         self.start_button.setObjectName("startButton")
         self.start_button.clicked.connect(self.start_upload)
-        action_button_layout.addWidget(self.start_button)
+        primary_button_layout.addWidget(self.start_button)
 
-        self.stop_button = QPushButton("停止")
+        self.stop_button = QPushButton("停止任务")
         self.stop_button.setObjectName("stopButton")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.stop_upload)
-        action_button_layout.addWidget(self.stop_button)
+        primary_button_layout.addWidget(self.stop_button)
 
-        self.route_button = QPushButton("生成路线")
+        self.route_button = QPushButton("设计/更新路线")
+        self.route_button.setToolTip("未设置自定义路线时，将使用默认路线。")
         self.route_button.clicked.connect(self.open_route_generator)
-        action_button_layout.addWidget(self.route_button)
+        secondary_button_layout.addWidget(self.route_button)
 
-        self.info_button = QPushButton("关于")
+        self.info_button = QPushButton("说明")
         self.info_button.clicked.connect(self.show_info_dialog)
-        action_button_layout.addWidget(self.info_button)
+        secondary_button_layout.addWidget(self.info_button)
 
-        scroll_layout.addLayout(action_button_layout)
+        action_button_layout.addLayout(primary_button_layout)
+        action_button_layout.addLayout(secondary_button_layout)
 
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setValue(0)
-        scroll_layout.addWidget(self.progress_bar)
+        right_column.addLayout(action_button_layout)
+        right_column.addWidget(self.create_hint_label("未设置自定义路线时会使用默认路线；需要更换路线时点击“设计/更新路线”。"))
+        right_column.addStretch(1)
 
-        self.status_label = QLabel("状态: 待命")
-        scroll_layout.addWidget(self.status_label)
-        
-        self.log_output_area = QTextEdit()
-        self.log_output_area.setReadOnly(True)
-        self.log_output_area.setFont(QFont("Monospace", 9))
-        # Reduce the vertical stretch factor to give more space to other components
-        self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        scroll_layout.addWidget(self.log_output_area)
+        content_layout.addLayout(left_column, 5)
+        content_layout.addLayout(right_column, 4)
+        scroll_layout.addLayout(content_layout)
 
         top_h_layout.addWidget(self.center_widget)
 
         self.setLayout(top_h_layout)
-
-    def on_run_days_changed(self, text):
-        """处理运行天数选择变化事件"""
-        if text == "自定义":
-            self.custom_days_input.setVisible(True)
-        else:
-            self.custom_days_input.setVisible(False)
-
-    def on_run_time_changed(self, text):
-        """处理运行时间选择变化事件"""
-        if text == "自定义时间 (HH:MM:SS)":
-            self.custom_time_input.setVisible(True)
-        else:
-            self.custom_time_input.setVisible(False)
 
     def resizeEvent(self, event):
         """
@@ -496,10 +578,9 @@ class SportsUploaderUI(QWidget):
         """
         根据给定的窗口宽度，计算并设置 center_widget 的固定宽度。
         """
-        # 不强制很大的最小宽度，使用窗口宽度的 90% 或最大 600 的限制
-        calculated_width = int(min(window_width * 0.9, 600))
-        # 保证最小为 280，以适配窄窗口（比如 300px）
-        calculated_width = max(280, calculated_width)
+        # 横向布局需要更宽的内容区，同时保留少量边距。
+        calculated_width = int(min(window_width * 0.96, 1120))
+        calculated_width = max(780, calculated_width)
         self.center_widget.setFixedWidth(calculated_width)
 
     def center_window(self):
@@ -522,56 +603,30 @@ class SportsUploaderUI(QWidget):
             username = self.username_input.text().strip()
             password = self.password_input.text()
 
-            # 获取运行次数
-            run_times_text = self.run_days_combo.currentText()
-            if run_times_text == "自定义":
-                custom_days_text = self.custom_days_input.text().strip()
-                if not custom_days_text:
-                    raise ValueError("请输入自定义天数。")
-                try:
-                    run_times = int(custom_days_text)
-                    if run_times <= 0:
-                        raise ValueError("运行次数必须大于0。")
-                except ValueError:
-                    raise ValueError("自定义天数必须是正整数。")
-            else:
-                run_times = int(run_times_text)
+            # 获取跑步次数、跑步时间和距离
+            run_days_text = self.run_days_input.text().strip()
+            if not re.fullmatch(r"\d+", run_days_text):
+                raise ValueError("跑步次数应为正整数，例如 5")
+            run_times = int(run_days_text)
+            if not (1 <= run_times <= 30):
+                raise ValueError("跑步次数应在 1-30 之间")
 
-            # 获取运行时间
-            run_time_text = self.run_time_combo.currentText()
-            if run_time_text == "自定义时间 (HH:MM:SS)":
-                # Use custom time input
-                custom_time_text = self.custom_time_input.text().strip()
-                if not custom_time_text:
-                    raise ValueError("请输入自定义时间，格式为 HH:MM:SS")
+            run_time_text = self.run_time_input.text().strip()
+            if not re.fullmatch(r"\d{2}:\d{2}:\d{2}", run_time_text):
+                raise ValueError("时间格式应为 HH:MM:SS，例如 08:00:00")
+            run_hour, run_minute, run_second = [int(part) for part in run_time_text.split(":")]
+            if not (0 <= run_hour <= 23 and 0 <= run_minute <= 59 and 0 <= run_second <= 59):
+                raise ValueError("时间范围无效，小时应为 00-23，分钟和秒应为 00-59")
 
-                try:
-                    # Parse custom time in HH:MM:SS format
-                    time_parts = custom_time_text.split(':')
-                    if len(time_parts) != 3:
-                        raise ValueError("时间格式错误，应为 HH:MM:SS")
-                    run_hour = int(time_parts[0])
-                    run_minute = int(time_parts[1])
-                    run_second = int(time_parts[2])
-
-                    if not (0 <= run_hour <= 23):
-                        raise ValueError("小时应在 0-23 之间")
-                    if not (0 <= run_minute <= 59):
-                        raise ValueError("分钟应在 0-59 之间")
-                    if not (0 <= run_second <= 59):
-                        raise ValueError("秒钟应在 0-59 之间")
-                except ValueError:
-                    raise ValueError("时间格式错误，应为 HH:MM:SS，例如 08:30:45")
-            else:
-                # Use predefined time - format is "HH:00"
-                time_parts = run_time_text.split(':')
-                run_hour = int(time_parts[0])  # Extract hour from "HH:00" format
-                run_minute = int(time_parts[1])  # Extract minute from "HH:00" format (should be 00)
-                run_second = 0  # Default second for predefined times
-
-            # 获取运行距离（公里）
-            run_distance_text = self.run_distance_combo.currentText()
-            run_distance_km = int(run_distance_text.split()[0])  # Extract km from "X km" format
+            run_distance_text = self.run_distance_input.text().strip()
+            try:
+                run_distance_km = float(run_distance_text)
+            except ValueError:
+                raise ValueError("距离应为数字，单位 km，例如 3 或 4")
+            if not (0 < run_distance_km <= 4):
+                raise ValueError("距离应大于 0 且不超过 4km")
+            if run_distance_km.is_integer():
+                run_distance_km = int(run_distance_km)
 
             current_config = {
                 "USER_ID": username,
@@ -594,10 +649,15 @@ class SportsUploaderUI(QWidget):
                 "UPLOAD_URL": "https://pe.sjtu.edu.cn/api/running/result/upload"
             }
 
-            # Add start date from text input (the input is always filled with a default value)
+            # Add start date from direct input (the input is always filled with a default value)
             start_date_text = self.date_input.text().strip()
             if start_date_text:
-                current_config["START_DATE"] = start_date_text
+                try:
+                    from datetime import datetime
+                    parsed_date = datetime.strptime(start_date_text, '%Y-%m-%d')
+                    current_config["START_DATE"] = parsed_date.strftime('%Y-%m-%d')
+                except ValueError:
+                    raise ValueError("日期格式应为 YYYY-MM-DD，例如 2026-05-07")
 
             # START_TIME_EPOCH_MS 由后端生成，不从 UI 获取
 
@@ -705,10 +765,8 @@ class SportsUploaderUI(QWidget):
             return
 
         self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
         self.info_button.setEnabled(False)
-        self.username_input.setEnabled(False)
-        self.password_input.setEnabled(False)
 
         # 调用 login.py 获取 session，使用 UI 中的用户名/密码
         try:
@@ -726,13 +784,17 @@ class SportsUploaderUI(QWidget):
             current_config_to_send["USER_ID"] = username
         except Exception as e:
             self.log_output_text(f"登录失败: {e}", "error")
-            QMessageBox.critical(self, "登录失败", str(e))
             self.start_button.setEnabled(True)
             self.stop_button.setEnabled(False)
             self.username_input.setEnabled(True)
             self.password_input.setEnabled(True)
             self.info_button.setEnabled(True)
+            QMessageBox.critical(self, "登录失败", str(e))
             return
+
+        self.stop_button.setEnabled(True)
+        self.username_input.setEnabled(False)
+        self.password_input.setEnabled(False)
 
         # Check if current route exceeds target distance and ask user what to do
         try:
@@ -1003,11 +1065,11 @@ class SportsUploaderUI(QWidget):
                 if os.path.exists(user_txt_path):
                     QMessageBox.information(self, "当前路线", 
                                         "将使用当前路线文件：user.txt\n\n"
-                                        "如需修改路线，请选择\"生成路线\"按钮并创建新路线。")
+                                        "如需修改路线，请选择\"设计/更新路线\"按钮并创建新路线。")
                 else:
                     QMessageBox.information(self, "默认路线", 
                                         "将使用默认路线文件：default.txt\n\n"
-                                        "如需修改路线，请选择\"生成路线\"按钮并创建自定义路线。")
+                                        "如需修改路线，请选择\"设计/更新路线\"按钮并创建自定义路线。")
                     
         except Exception as e:
             QMessageBox.critical(self, "错误", f"打开路线规划器时出错：\n{str(e)}")
