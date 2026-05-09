@@ -3,16 +3,19 @@ import os
 import re
 import ctypes
 import shutil
+import tempfile
+import webbrowser
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
-    QSpacerItem, QFileDialog, QDialog, QFrame
+    QSpacerItem, QFileDialog, QDialog, QFrame, QGraphicsDropShadowEffect
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize
-from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices
+from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve
+from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap
 
 from src.main import run_sports_upload
+from src.route_preview import generate_route_preview_html
 import src.login as login
 from utils.auxiliary_util import SportsUploaderError, get_base_path
 import src.config as config
@@ -43,6 +46,71 @@ COMMITMENT_TEXT = (
 )
 
 
+class NoWheelComboBox(QComboBox):
+    """Combo box that avoids accidental mouse-wheel selection changes."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class GlowButton(QPushButton):
+    """Push button with a subtle neon glow on hover and focus."""
+
+    def __init__(self, text="", parent=None, glow_color=None):
+        super().__init__(text, parent)
+        self._glow_effect = QGraphicsDropShadowEffect(self)
+        self._glow_effect.setOffset(0, 0)
+        self._glow_effect.setBlurRadius(0)
+        self._glow_effect.setColor(glow_color or QColor(69, 255, 214, 180))
+        self.setGraphicsEffect(self._glow_effect)
+
+        self._glow_animation = QPropertyAnimation(self._glow_effect, b"blurRadius", self)
+        self._glow_animation.setDuration(170)
+        self._glow_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+    def set_glow_color(self, color):
+        self._glow_effect.setColor(color)
+
+    def _animate_glow(self, radius):
+        if not self.isEnabled():
+            radius = 0
+        self._glow_animation.stop()
+        self._glow_animation.setStartValue(self._glow_effect.blurRadius())
+        self._glow_animation.setEndValue(radius)
+        self._glow_animation.start()
+
+    def enterEvent(self, event):
+        self._animate_glow(28)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self.hasFocus():
+            self._animate_glow(0)
+        super().leaveEvent(event)
+
+    def focusInEvent(self, event):
+        self._animate_glow(24)
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        if not self.underMouse():
+            self._animate_glow(0)
+        super().focusOutEvent(event)
+
+    def mousePressEvent(self, event):
+        self._animate_glow(36)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._animate_glow(28 if self.underMouse() or self.hasFocus() else 0)
+        super().mouseReleaseEvent(event)
+
+    def changeEvent(self, event):
+        if event.type() == QEvent.EnabledChange and not self.isEnabled():
+            self._animate_glow(0)
+        super().changeEvent(event)
+
+
 def get_resource_path(relative_path):
     """Return a bundled resource path both in source and PyInstaller builds."""
     if hasattr(sys, "_MEIPASS"):
@@ -54,6 +122,7 @@ RESOURCES_FULL_PATH = get_resource_path(RESOURCES_SUB_DIR)
 APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM.ico"))
 if not os.path.exists(APP_ICON_PATH):
     APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM.png"))
+MAIN_BACKGROUND_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "mainBackground.jpeg"))
 
 
 def set_windows_app_id():
@@ -73,11 +142,14 @@ class WorkerThread(QThread):
     log_output = Signal(str, str)
     finished = Signal(bool, str)
     route_too_long = Signal(str, str)  # Signal to emit when route is too long
+    trajectory_risk_confirmation = Signal(object)
+    route_preview_ready = Signal(object)
 
     def __init__(self, config_data):
         super().__init__()
         self.config_data = config_data
         self._continue_after_route_check = True  # Default to continue execution
+        self._risk_decision = True
 
     def run(self):
         success = False
@@ -87,7 +159,9 @@ class WorkerThread(QThread):
                 self.config_data,
                 progress_callback=self.progress_callback,
                 log_cb=self.log_callback,
-                stop_check_cb=self.isInterruptionRequested
+                stop_check_cb=self.isInterruptionRequested,
+                risk_confirm_cb=self.risk_confirm_callback,
+                route_preview_cb=self.route_preview_callback
             )
         except SportsUploaderError as e:
             self.log_output.emit(f"任务中断: {e}", "error")
@@ -125,17 +199,36 @@ class WorkerThread(QThread):
                 return  # Don't emit the log message when it was a special route message
         self.log_output.emit(message, level)
 
+    def risk_confirm_callback(self, analysis):
+        if self.isInterruptionRequested():
+            return False
+
+        self._risk_decision = None
+        self.trajectory_risk_confirmation.emit(analysis)
+
+        while self._risk_decision is None and not self.isInterruptionRequested():
+            self.msleep(100)
+
+        return bool(self._risk_decision) and not self.isInterruptionRequested()
+
+    def route_preview_callback(self, preview):
+        self.route_preview_ready.emit(preview)
+
 
 class SportsUploaderUI(QWidget):
     def __init__(self):
         super().__init__()
+        self.setObjectName("mainWindow")
         self.setWindowTitle("SJTU 校园轻松跑 - Version " + config.global_version)
         self.setWindowIcon(QIcon(APP_ICON_PATH))
+        self._main_background_pixmap = QPixmap(MAIN_BACKGROUND_PATH)
 
         # 后台线程引用（私有）
         self._thread = None
         # 关于窗口引用，防止被垃圾回收
         self._help_window = None
+        self._latest_route_preview = None
+        self._route_preview_temp_files = []
 
         self.config = {}
 
@@ -155,52 +248,65 @@ class SportsUploaderUI(QWidget):
 
     def setup_ui_style(self):
         palette = self.palette()
-        palette.setColor(QPalette.Window, QColor(246, 248, 251))
-        palette.setColor(QPalette.WindowText, QColor(51, 51, 51))
-        palette.setColor(QPalette.Base, QColor(255, 255, 255))
-        palette.setColor(QPalette.AlternateBase, QColor(255, 255, 255))
-        palette.setColor(QPalette.ToolTipBase, QColor(255, 255, 255))
-        palette.setColor(QPalette.ToolTipText, QColor(51, 51, 51))
-        palette.setColor(QPalette.Text, QColor(51, 51, 51))
-        palette.setColor(QPalette.Button, QColor(255, 255, 255))
-        palette.setColor(QPalette.ButtonText, QColor(51, 51, 51))
+        palette.setColor(QPalette.Window, QColor(7, 16, 19))
+        palette.setColor(QPalette.WindowText, QColor(238, 246, 242))
+        palette.setColor(QPalette.Base, QColor(255, 255, 252))
+        palette.setColor(QPalette.AlternateBase, QColor(247, 250, 246))
+        palette.setColor(QPalette.ToolTipBase, QColor(14, 24, 27))
+        palette.setColor(QPalette.ToolTipText, QColor(255, 255, 252))
+        palette.setColor(QPalette.Text, QColor(27, 38, 44))
+        palette.setColor(QPalette.Button, QColor(255, 255, 252))
+        palette.setColor(QPalette.ButtonText, QColor(27, 38, 44))
         palette.setColor(QPalette.BrightText, QColor("red"))
-        palette.setColor(QPalette.Link, QColor(74, 144, 226))
-        palette.setColor(QPalette.Highlight, QColor(74, 144, 226))
+        palette.setColor(QPalette.Link, QColor(25, 104, 96))
+        palette.setColor(QPalette.Highlight, QColor(25, 104, 96))
         palette.setColor(QPalette.HighlightedText, QColor(255, 255, 255))
         self.setPalette(palette)
 
         self.setStyleSheet("""
             /* 基础设置 */
             QWidget {
-                background-color: rgb(246, 248, 251);
-                color: rgb(34, 45, 57);
-                font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+                background-color: transparent;
+                color: rgb(238, 246, 242);
+                font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+            }
+
+            #mainWindow, #contentShell, #mainScrollArea, #scrollContent {
+                background-color: transparent;
             }
 
             #appHeader {
-                background-color: rgb(255, 255, 255);
-                border: 1px solid rgb(225, 231, 238);
+                background-color: rgba(8, 14, 24, 156);
+                border: 1px solid rgba(255, 255, 255, 76);
                 border-radius: 8px;
             }
 
             #appTitle {
-                color: rgb(26, 36, 48);
-                font-size: 15pt;
-                font-weight: 700;
+                color: rgb(255, 255, 252);
+                font-size: 17pt;
+                font-weight: 800;
                 background-color: transparent;
             }
 
             #sectionHint {
-                color: rgb(100, 116, 139);
+                color: rgba(229, 246, 240, 210);
                 font-size: 8pt;
                 background-color: transparent;
             }
 
+            #floatingHint {
+                color: rgba(255, 255, 252, 224);
+                font-size: 8pt;
+                background-color: rgba(8, 14, 24, 118);
+                border: 1px solid rgba(72, 255, 215, 82);
+                border-radius: 7px;
+                padding: 7px 9px;
+            }
+
             #warningBox {
-                background-color: rgb(255, 247, 237);
-                color: rgb(124, 45, 18);
-                border: 1px solid rgb(251, 191, 36);
+                background-color: rgba(34, 22, 8, 182);
+                color: rgb(255, 241, 205);
+                border: 1px solid rgba(255, 204, 95, 154);
                 border-radius: 8px;
                 padding: 18px;
                 font-size: 10pt;
@@ -212,40 +318,53 @@ class SportsUploaderUI(QWidget):
             QGroupBox {
                 font-size: 10pt;
                 font-weight: bold;
-                margin-top: 10px;
-                border: 1px solid rgb(225, 231, 238);
+                margin-top: 0;
+                border: 1px solid rgba(78, 255, 216, 72);
                 border-radius: 8px;
-                padding: 15px;
-                color: rgb(42, 111, 151);
-                background-color: rgb(255, 255, 255);
+                padding: 32px 15px 15px 15px;
+                color: rgb(225, 255, 248);
+                background-color: rgba(6, 14, 22, 166);
             }
             QGroupBox::title {
-                subcontrol-origin: margin;
+                subcontrol-origin: padding;
                 subcontrol-position: top left;
-                padding: 0 5px 0 5px;
-                color: rgb(42, 111, 151);
-                background-color: rgb(246, 248, 251);
+                left: 12px;
+                top: 7px;
+                padding: 3px 12px;
+                color: rgb(232, 255, 248);
+                background-color: rgba(11, 28, 34, 210);
+                border: 1px solid rgba(88, 255, 220, 124);
+                border-radius: 10px;
             }
             
             /* 确保所有标签和输入框可见 */
             QLabel {
-                color: rgb(34, 45, 57);
+                color: rgb(235, 247, 243);
                 background-color: transparent;
                 font-size: 9pt;
             }
             
             QLineEdit, QComboBox, QDateTimeEdit {
-                background-color: rgb(255, 255, 255);
-                border: 1px solid rgb(203, 213, 225);
+                background-color: rgba(6, 18, 27, 188);
+                border: 1px solid rgba(94, 255, 223, 104);
                 border-radius: 6px;
                 padding: 8px;
-                color: rgb(30, 41, 59);
+                color: rgb(239, 255, 250);
                 font-size: 9pt;
                 min-height: 20px;
+                selection-background-color: rgb(75, 255, 218);
+                selection-color: rgb(4, 20, 23);
+                placeholder-text-color: rgba(226, 244, 238, 154);
             }
             
-            QLineEdit:focus, QComboBox:focus {
-                border: 1px solid rgb(42, 111, 151);
+            QLineEdit:hover, QComboBox:hover, QDateTimeEdit:hover {
+                border: 1px solid rgba(94, 255, 223, 168);
+                background-color: rgba(7, 25, 35, 206);
+            }
+
+            QLineEdit:focus, QComboBox:focus, QDateTimeEdit:focus {
+                border: 1px solid rgba(75, 255, 218, 230);
+                background-color: rgba(7, 31, 43, 226);
             }
             
             QComboBox::drop-down {
@@ -253,101 +372,133 @@ class SportsUploaderUI(QWidget):
                 subcontrol-position: top right;
                 width: 20px;
                 border-left-width: 1px;
-                border-left-color: rgb(203, 213, 225);
+                border-left-color: rgba(94, 255, 223, 96);
                 border-left-style: solid;
                 border-top-right-radius: 6px;
                 border-bottom-right-radius: 6px;
             }
+            QComboBox QAbstractItemView {
+                background-color: rgb(8, 20, 28);
+                color: rgb(239, 255, 250);
+                border: 1px solid rgba(75, 255, 218, 190);
+                border-radius: 6px;
+                selection-background-color: rgb(17, 122, 109);
+                selection-color: rgb(255, 255, 255);
+                outline: 0;
+                padding: 6px;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 28px;
+                padding: 6px 8px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: rgb(15, 68, 67);
+                color: rgb(255, 255, 255);
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: rgb(17, 122, 109);
+                color: rgb(255, 255, 255);
+            }
             QPushButton {
-                background-color: rgb(255, 255, 255);
-                color: rgb(30, 41, 59);
-                border: 1px solid rgb(203, 213, 225);
+                background-color: rgba(8, 18, 26, 170);
+                color: rgb(240, 255, 250);
+                border: 1px solid rgba(91, 255, 222, 78);
                 border-radius: 6px;
                 padding: 8px 16px;
                 min-height: 24px;
                 max-height: 36px;
+                font-weight: 600;
             }
             QPushButton:hover {
-                border: 1px solid rgb(42, 111, 151);
-                background-color: rgb(248, 251, 253);
+                color: rgb(255, 255, 255);
+                border: 1px solid rgba(75, 255, 218, 212);
+                background-color: rgba(13, 35, 43, 214);
             }
             QPushButton:pressed {
-                background-color: rgb(238, 243, 247);
+                border: 1px solid rgba(169, 255, 232, 236);
+                background-color: rgba(15, 69, 72, 226);
             }
             QPushButton:disabled {
-                background-color: rgb(248, 250, 252);
-                color: rgb(148, 163, 184);
-                border: 1px solid rgb(226, 232, 240);
+                background-color: rgba(26, 35, 39, 126);
+                color: rgba(210, 225, 219, 138);
+                border: 1px solid rgba(210, 225, 219, 54);
             }
             QProgressBar {
-                border: 1px solid rgb(225, 231, 238);
+                border: 1px solid rgba(84, 255, 222, 104);
                 border-radius: 6px;
                 text-align: center;
-                background-color: rgb(255, 255, 255);
-                color: rgb(30, 41, 59);
+                background-color: rgba(5, 15, 23, 186);
+                color: rgb(226, 255, 248);
                 max-height: 20px;
+                font-weight: 700;
             }
             QProgressBar::chunk {
-                background-color: rgb(42, 111, 151);
+                background-color: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 rgba(58, 255, 214, 230),
+                    stop: 1 rgba(122, 206, 255, 224)
+                );
                 border-radius: 6px;
             }
             QTextEdit {
-                background-color: rgb(250, 252, 254);
-                border: 1px solid rgb(225, 231, 238);
+                background-color: rgba(3, 12, 20, 188);
+                border: 1px solid rgba(84, 255, 222, 112);
                 border-radius: 6px;
                 padding: 8px;
-                color: rgb(30, 41, 59);
+                color: rgb(168, 247, 255);
+                selection-background-color: rgb(75, 255, 218);
+                selection-color: rgb(4, 20, 23);
             }
             QScrollArea {
                 border: none;
             }
             QCheckBox {
                 spacing: 5px;
-                color: rgb(51, 51, 51);
+                color: rgb(235, 247, 243);
             }
             QCheckBox::indicator {
                 width: 16px;
                 height: 16px;
                 border-radius: 3px;
-                border: 1px solid rgb(204, 204, 204);
-                background-color: rgb(255, 255, 255);
+                border: 1px solid rgba(139, 164, 153, 178);
+                background-color: rgba(255, 255, 252, 226);
             }
             QCheckBox::indicator:checked {
-                background-color: rgb(74, 144, 226);
-                border: 1px solid rgb(74, 144, 226);
+                background-color: rgb(16, 128, 111);
+                border: 1px solid rgb(16, 128, 111);
             }
             QCheckBox::indicator:disabled {
-                border: 1px solid rgb(230, 230, 230);
-                background-color: rgb(255, 255, 255);
+                border: 1px solid rgba(220, 227, 217, 142);
+                background-color: rgba(225, 231, 225, 178);
             }
             QFormLayout QLabel {
                 padding-top: 8px;
                 padding-bottom: 8px;
-                color: rgb(71, 85, 105);
+                color: rgb(224, 242, 236);
             }
             #startButton {
-                background-color: rgb(36, 126, 90);
+                background-color: rgba(11, 116, 104, 226);
                 color: white;
-                border: 1px solid rgb(36, 126, 90);
+                border: 1px solid rgba(69, 255, 214, 174);
             }
             #startButton:hover {
-                background-color: rgb(31, 111, 79);
-                border: 1px solid rgb(31, 111, 79);
+                background-color: rgba(15, 158, 136, 236);
+                border: 1px solid rgba(82, 255, 218, 240);
             }
             #startButton:pressed {
-                background-color: rgb(25, 92, 66);
+                background-color: rgb(8, 95, 88);
             }
             #stopButton {
-                background-color: rgb(197, 48, 69);
+                background-color: rgba(159, 42, 67, 225);
                 color: white;
-                border: 1px solid rgb(197, 48, 69);
+                border: 1px solid rgba(255, 82, 153, 174);
             }
             #stopButton:hover {
-                background-color: rgb(167, 40, 58);
-                border: 1px solid rgb(167, 40, 58);
+                background-color: rgba(196, 49, 92, 236);
+                border: 1px solid rgba(255, 91, 166, 236);
             }
             #stopButton:pressed {
-                background-color: rgb(137, 32, 48);
+                background-color: rgb(124, 26, 57);
             }
             #shuiyuanButton {
                 padding: 6px;
@@ -355,27 +506,79 @@ class SportsUploaderUI(QWidget):
                 max-width: 178px;
                 min-height: 42px;
                 max-height: 42px;
+                background-color: rgba(6, 18, 27, 182);
+                border: 1px solid rgba(85, 255, 221, 104);
+            }
+            #shuiyuanButton:hover {
+                background-color: rgba(8, 31, 43, 218);
+                border: 1px solid rgba(85, 255, 221, 216);
+            }
+            #shuiyuanButton:pressed {
+                background-color: rgba(7, 45, 52, 232);
+                border: 1px solid rgba(169, 255, 232, 236);
             }
             #githubButton {
-                background-color: rgb(15, 23, 42);
+                background-color: rgba(8, 14, 24, 184);
                 color: rgb(255, 255, 255);
-                border: 1px solid rgb(15, 23, 42);
+                border: 1px solid rgba(129, 206, 255, 116);
                 font-weight: 600;
             }
             #githubButton:hover {
-                background-color: rgb(30, 41, 59);
-                border: 1px solid rgb(30, 41, 59);
+                background-color: rgba(11, 29, 45, 222);
+                border: 1px solid rgba(118, 205, 255, 220);
             }
             #githubButton:pressed {
-                background-color: rgb(2, 6, 23);
+                background-color: rgb(16, 25, 30);
+            }
+            #routeButton, #infoButton, #routePreviewButton {
+                background-color: rgba(32, 25, 9, 156);
+                border: 1px solid rgba(255, 226, 105, 118);
+                color: rgb(255, 246, 202);
+            }
+            #routeButton:hover, #infoButton:hover, #routePreviewButton:hover {
+                background-color: rgba(68, 50, 10, 204);
+                border: 1px solid rgba(255, 228, 96, 236);
+            }
+            #routeButton:pressed, #infoButton:pressed, #routePreviewButton:pressed {
+                background-color: rgba(98, 72, 12, 224);
+            }
+            #routePreviewButton:disabled {
+                background-color: rgba(30, 34, 32, 126);
+                color: rgba(255, 246, 202, 124);
+                border: 1px solid rgba(255, 226, 105, 54);
             }
             QLabel#getCookieLink {
-                color: rgb(42, 111, 151);
+                color: rgb(121, 255, 225);
                 text-decoration: underline;
                 padding: 0;
             }
             QLabel#getCookieLink:hover {
-                color: rgb(34, 91, 125);
+                color: rgb(180, 255, 238);
+            }
+            QScrollBar:vertical {
+                background-color: rgba(8, 14, 24, 82);
+                width: 10px;
+                margin: 0;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background-color: rgba(255, 255, 252, 118);
+                min-height: 30px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 252, 178);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+                border: none;
+                background: transparent;
+            }
+            QToolTip {
+                background-color: rgb(27, 38, 44);
+                color: rgb(255, 255, 252);
+                border: 1px solid rgb(91, 122, 111);
+                padding: 6px;
             }
         """)
 
@@ -455,16 +658,13 @@ class SportsUploaderUI(QWidget):
         routes_dir = get_resource_path(ROUTES_SUB_DIR)
         if os.path.isdir(routes_dir):
             route_files = [
-                os.path.join(routes_dir, file_name)
-                for file_name in os.listdir(routes_dir)
-                if file_name.lower().endswith(".txt")
+                os.path.join(routes_dir, "default.txt")
             ]
-            route_files.sort(
-                key=lambda path: (
-                    0 if os.path.basename(path).lower() == "default.txt" else 1,
-                    os.path.basename(path).lower(),
-                )
-            )
+            route_files = [
+                route_path
+                for route_path in route_files
+                if os.path.exists(route_path)
+            ]
 
             for route_path in route_files:
                 file_name = os.path.basename(route_path)
@@ -571,12 +771,16 @@ class SportsUploaderUI(QWidget):
         top_h_layout.setSpacing(0)
 
         self.center_widget = QWidget()
+        self.center_widget.setObjectName("contentShell")
         main_layout = QVBoxLayout(self.center_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
         self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("mainScrollArea")
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
         self.scroll_content = QWidget()
+        self.scroll_content.setObjectName("scrollContent")
         scroll_layout = QVBoxLayout(self.scroll_content)
         # Add margins to make content look better in the larger window
         scroll_layout.setContentsMargins(20, 20, 20, 20)
@@ -584,6 +788,7 @@ class SportsUploaderUI(QWidget):
         scroll_layout.setSpacing(15)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_content)
+        self.scroll_area.viewport().setAutoFillBackground(False)
 
         main_layout.addWidget(self.scroll_area)
 
@@ -614,7 +819,7 @@ class SportsUploaderUI(QWidget):
         title_block.addWidget(title_label)
         header_layout.addLayout(title_block, 1)
 
-        self.shuiyuan_button = QPushButton()
+        self.shuiyuan_button = GlowButton(glow_color=QColor(69, 255, 214, 170))
         self.shuiyuan_button.setObjectName("shuiyuanButton")
         shuiyuan_icon_path = os.path.join(RESOURCES_FULL_PATH, "shuiyuan_logo.svg")
         if os.path.exists(shuiyuan_icon_path):
@@ -626,7 +831,7 @@ class SportsUploaderUI(QWidget):
         self.shuiyuan_button.clicked.connect(self.open_shuiyuan_topic)
         header_layout.addWidget(self.shuiyuan_button)
 
-        self.github_button = QPushButton("GitHub")
+        self.github_button = GlowButton("GitHub", glow_color=QColor(118, 205, 255, 185))
         self.github_button.setObjectName("githubButton")
         github_icon_path = os.path.join(RESOURCES_FULL_PATH, "github-mark.svg")
         if os.path.exists(github_icon_path):
@@ -789,12 +994,12 @@ class SportsUploaderUI(QWidget):
         route_label_layout.addStretch()
         route_layout.addLayout(route_label_layout)
 
-        self.route_combo = QComboBox()
+        self.route_combo = NoWheelComboBox()
         self.route_combo.setToolTip("选择本次生成记录使用的路线。")
         self.populate_route_combo()
         self.route_combo.currentIndexChanged.connect(self.on_route_combo_changed)
         route_layout.addWidget(self.route_combo)
-        route_layout.addWidget(self.create_hint_label("可选择内置路线，或选择“自定义...”导入 txt 路线文件。"))
+        route_layout.addWidget(self.create_hint_label("内置路线暂仅保留 default；其他路线待校验后恢复，也可选择“自定义...”导入 txt。"))
 
         run_settings_layout.addLayout(route_layout)
 
@@ -808,23 +1013,25 @@ class SportsUploaderUI(QWidget):
         secondary_button_layout = QHBoxLayout()
         secondary_button_layout.setSpacing(12)
 
-        self.start_button = QPushButton("开始生成并上传")
+        self.start_button = GlowButton("开始生成并上传", glow_color=QColor(69, 255, 214, 190))
         self.start_button.setObjectName("startButton")
         self.start_button.clicked.connect(self.start_upload)
         primary_button_layout.addWidget(self.start_button)
 
-        self.stop_button = QPushButton("停止任务")
+        self.stop_button = GlowButton("停止任务", glow_color=QColor(255, 82, 153, 190))
         self.stop_button.setObjectName("stopButton")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.stop_upload)
         primary_button_layout.addWidget(self.stop_button)
 
-        self.route_button = QPushButton("设计/更新路线")
+        self.route_button = GlowButton("设计/更新路线", glow_color=QColor(255, 226, 105, 180))
+        self.route_button.setObjectName("routeButton")
         self.route_button.setToolTip("打开路线规划器生成 txt；生成后在“预设路线”中选择“自定义...”导入。")
         self.route_button.clicked.connect(self.open_route_generator)
         secondary_button_layout.addWidget(self.route_button)
 
-        self.info_button = QPushButton("说明")
+        self.info_button = GlowButton("说明", glow_color=QColor(255, 226, 105, 180))
+        self.info_button.setObjectName("infoButton")
         self.info_button.clicked.connect(self.show_info_dialog)
         secondary_button_layout.addWidget(self.info_button)
 
@@ -832,7 +1039,29 @@ class SportsUploaderUI(QWidget):
         action_button_layout.addLayout(secondary_button_layout)
 
         right_column.addLayout(action_button_layout)
-        right_column.addWidget(self.create_hint_label("需要新路线时点击“设计/更新路线”，生成 txt 后通过“预设路线”里的“自定义...”导入。"))
+        route_generator_hint = self.create_hint_label("需要新路线时点击“设计/更新路线”，生成 txt 后通过“预设路线”里的“自定义...”导入。")
+        route_generator_hint.setObjectName("floatingHint")
+        right_column.addWidget(route_generator_hint)
+
+        route_preview_group = QGroupBox("路线预览")
+        route_preview_layout = QVBoxLayout()
+        route_preview_layout.setContentsMargins(15, 15, 15, 15)
+        route_preview_layout.setSpacing(10)
+
+        self.route_preview_summary_label = QLabel("生成后显示实际上传路线。")
+        self.route_preview_summary_label.setObjectName("sectionHint")
+        self.route_preview_summary_label.setWordWrap(True)
+        route_preview_layout.addWidget(self.route_preview_summary_label)
+
+        self.route_preview_button = GlowButton("查看本次路线", glow_color=QColor(255, 226, 105, 180))
+        self.route_preview_button.setObjectName("routePreviewButton")
+        self.route_preview_button.setEnabled(False)
+        self.route_preview_button.setToolTip("查看当前生成并用于上传的实际轨迹。")
+        self.route_preview_button.clicked.connect(self.show_route_preview)
+        route_preview_layout.addWidget(self.route_preview_button)
+
+        route_preview_group.setLayout(route_preview_layout)
+        right_column.addWidget(route_preview_group)
         right_column.addStretch(1)
 
         content_layout.addLayout(left_column, 5)
@@ -842,6 +1071,20 @@ class SportsUploaderUI(QWidget):
         top_h_layout.addWidget(self.center_widget)
 
         self.setLayout(top_h_layout)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        pixmap = getattr(self, "_main_background_pixmap", QPixmap())
+        if not pixmap.isNull():
+            scaled = pixmap.scaled(self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+        else:
+            painter.fillRect(self.rect(), QColor(7, 16, 19))
+
+        painter.fillRect(self.rect(), QColor(5, 12, 15, 142))
+        super().paintEvent(event)
 
     def resizeEvent(self, event):
         """
@@ -1239,6 +1482,8 @@ class SportsUploaderUI(QWidget):
         self._thread.progress_update.connect(self.update_progress)
         self._thread.log_output.connect(self.log_output_text)
         self._thread.route_too_long.connect(self.handle_route_too_long)
+        self._thread.trajectory_risk_confirmation.connect(self.handle_trajectory_risk_confirmation)
+        self._thread.route_preview_ready.connect(self.handle_route_preview_ready)
         self._thread.finished.connect(self.upload_finished)
         self._thread.start()
 
@@ -1279,6 +1524,76 @@ class SportsUploaderUI(QWidget):
                 self.stop_button.setEnabled(False)
                 self.status_label.setText("状态: 正在停止...")
 
+    def handle_trajectory_risk_confirmation(self, analysis):
+        """Ask the user whether to continue uploading a high-risk trajectory."""
+        score = analysis.get("score", 0)
+        level_label = analysis.get("level_label", "高风险")
+        stats = analysis.get("stats", {})
+        findings = analysis.get("findings", [])[:3]
+        reason_text = "\n".join(
+            f"- {item.get('name', '风险项')} +{item.get('score', 0)}: {item.get('detail', '')}"
+            for item in findings
+        ) or "- 未提供具体风险原因"
+
+        point_count = stats.get("point_count", 0)
+        distance_km = (stats.get("distance_m", 0) or 0) / 1000
+        duration_sec = stats.get("duration_sec", 0) or 0
+
+        reply = QMessageBox.question(
+            self,
+            "高风险轨迹确认",
+            f"风险指数: {score}/100（{level_label}）\n"
+            f"轨迹概况: {point_count} 个点，{distance_km:.2f}km，{duration_sec:.0f}s\n\n"
+            f"主要原因:\n{reason_text}\n\n"
+            f"是否继续上传这条轨迹？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if self._thread:
+            if reply == QMessageBox.StandardButton.Yes:
+                self._thread._risk_decision = True
+                self.log_output_text("用户选择继续上传高风险轨迹", "warning")
+            else:
+                self._thread._risk_decision = False
+                self.log_output_text("用户取消上传高风险轨迹", "warning")
+
+    def handle_route_preview_ready(self, preview):
+        self._latest_route_preview = preview
+        summary = preview.get("summary", "暂无可预览路线") if isinstance(preview, dict) else "暂无可预览路线"
+        if hasattr(self, "route_preview_summary_label"):
+            self.route_preview_summary_label.setText(summary)
+        if hasattr(self, "route_preview_button"):
+            self.route_preview_button.setEnabled(bool(isinstance(preview, dict) and preview.get("available")))
+
+    def show_route_preview(self):
+        preview = getattr(self, "_latest_route_preview", None)
+        if not preview or not preview.get("available"):
+            QMessageBox.information(self, "路线预览", "暂无可预览路线。请先生成跑步数据。")
+            return
+
+        try:
+            html_content = generate_route_preview_html(preview)
+            temp_path = self.write_route_preview_html(html_content)
+            webbrowser.open(QUrl.fromLocalFile(temp_path).toString())
+            self.log_output_text("已在系统浏览器中打开路线预览。", "info")
+        except Exception as e:
+            self.log_output_text(f"无法打开路线预览: {e}", "error")
+            QMessageBox.warning(self, "路线预览失败", str(e))
+
+    def write_route_preview_html(self, html_content):
+        temp_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".html",
+            prefix="sjtu_route_preview_",
+            delete=False,
+        )
+        with temp_file:
+            temp_file.write(html_content)
+        self._route_preview_temp_files.append(temp_file.name)
+        return os.path.abspath(temp_file.name)
+
     def stop_upload(self):
         """请求工作线程停止。"""
         if self._thread and self._thread.isRunning():
@@ -1303,13 +1618,13 @@ class SportsUploaderUI(QWidget):
 
         format = QTextCharFormat()
         if level == "error":
-            format.setForeground(QColor("#DC3545"))
+            format.setForeground(QColor("#FF5C9F"))
         elif level == "warning":
-            format.setForeground(QColor("#FFA500"))
+            format.setForeground(QColor("#FFE66D"))
         elif level == "success":
-            format.setForeground(QColor("#4CAF50"))
+            format.setForeground(QColor("#55FFD8"))
         else:
-            format.setForeground(QColor("#333333"))
+            format.setForeground(QColor("#A8F7FF"))
 
         # 如果是进度类短消息（例如: 已完成1/25），尝试替换最后一行以便在同一行更新
         try:

@@ -1,13 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
 block_cipher = None
 
+project_root = Path(SPECPATH).resolve()
+assets_dir = project_root / 'assets'
+icon_path = assets_dir / 'SJTURM.ico'
+
 a = Analysis(
-    ['qtui.py'],
-    pathex=[],
+    [str(project_root / 'qtui.py')],
+    pathex=[str(project_root)],
     binaries=[],
     datas=[
-        ('assets', 'assets'),
+        (str(assets_dir), 'assets'),
     ],
     hiddenimports=[
         'PySide6.QtCore',
@@ -21,6 +27,8 @@ a = Analysis(
         'src.info_dialog',
         'src.login',
         'src.config',
+        'src.route_preview',
+        'src.trajectory_risk_analyzer',
         'utils.auxiliary_util',
         'assets.resources_rc',
     ],
@@ -56,5 +64,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets\\SJTURM.ico',
+    icon=str(icon_path),
 )
