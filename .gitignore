@@ -16,6 +16,7 @@ env/
 
 # PyInstaller
 *.spec
+!main.spec
 
 # IDE
 .idea/
@@ -57,6 +58,7 @@ Thumbs.db
 # Project specific
 configs/*
 refs/
+/Routes/
 
 # Other
 *.log

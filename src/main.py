@@ -3,9 +3,48 @@ import datetime
 import random
 from src.api_client import get_authorization_token_and_rules, upload_running_data
 from src.data_generator import generate_running_data_payload
+from src.route_preview import build_route_preview, update_preview_status
+from src.trajectory_risk_analyzer import analyze_running_payload
 from utils.auxiliary_util import log_output, SportsUploaderError, get_current_epoch_ms
 
-def run_sports_upload(config, progress_callback=None, log_cb=None, stop_check_cb=None):
+
+def _check_trajectory_risk(running_data_payload, log_cb=None, risk_confirm_cb=None, context="轨迹", analysis=None):
+    analysis = analysis or analyze_running_payload(running_data_payload)
+    log_level = "warning" if analysis["level"] in ("medium", "high") else "info"
+    log_output(
+        f"{context}风险检测: {analysis['score']}/100（{analysis['level_label']}）",
+        log_level,
+        log_cb,
+    )
+
+    for finding in analysis.get("findings", [])[:3]:
+        log_output(
+            f"  - {finding['name']} +{finding['score']}: {finding['detail']}",
+            log_level,
+            log_cb,
+        )
+
+    if analysis["level"] == "high":
+        if risk_confirm_cb:
+            return bool(risk_confirm_cb(analysis))
+        log_output("检测到高风险轨迹，但当前运行环境没有确认回调，默认继续。", "warning", log_cb)
+
+    return True
+
+
+def _emit_route_preview(route_preview_cb, preview):
+    if route_preview_cb:
+        route_preview_cb(preview)
+
+
+def run_sports_upload(
+    config,
+    progress_callback=None,
+    log_cb=None,
+    stop_check_cb=None,
+    risk_confirm_cb=None,
+    route_preview_cb=None,
+):
 
     if stop_check_cb and stop_check_cb():
         return False, "任务已停止。"
@@ -36,6 +75,7 @@ def run_sports_upload(config, progress_callback=None, log_cb=None, stop_check_cb
         running_data_payload, total_dist, total_dur = generate_running_data_payload(
             config, [], point_rules_data, log_cb=log_cb, stop_check_cb=stop_check_cb
         )
+        _check_trajectory_risk(running_data_payload, log_cb=log_cb, context="预检轨迹")
 
     except SportsUploaderError as e:
         log_output(f"生成失败: {e}", "error", log_cb)
@@ -109,6 +149,29 @@ def run_sports_upload(config, progress_callback=None, log_cb=None, stop_check_cb
                     log_cb=log_cb,
                     stop_check_cb=stop_check_cb
                 )
+                risk_analysis = analyze_running_payload(running_data_payload)
+                current_preview = build_route_preview(
+                    running_data_payload,
+                    run_index=idx,
+                    total_runs=total_runs,
+                    status="待上传",
+                    risk_analysis=risk_analysis,
+                )
+                _emit_route_preview(route_preview_cb, current_preview)
+
+                if not _check_trajectory_risk(
+                    running_data_payload,
+                    log_cb=log_cb,
+                    risk_confirm_cb=risk_confirm_cb,
+                    context=f"第{idx}/{total_runs}条轨迹",
+                    analysis=risk_analysis,
+                ):
+                    log_output(f"用户取消第{idx}/{total_runs}条高风险轨迹上传", "warning", log_cb)
+                    _emit_route_preview(route_preview_cb, update_preview_status(current_preview, "已取消"))
+                    fail_count += 1
+                    log_output(f"已完成{idx}/{total_runs}", "info", log_cb)
+                    if progress_callback: progress_callback(idx, total_runs, f"已完成{idx}/{total_runs}")
+                    continue
             except SportsUploaderError as e:
                 log_output(f"生成跑步数据失败（第{idx}/{total_runs}条）: {e}", "error", log_cb)
                 fail_count += 1
@@ -125,6 +188,7 @@ def run_sports_upload(config, progress_callback=None, log_cb=None, stop_check_cb
 
             try:
                 log_output(f"尝试上传第{idx}/{total_runs}条跑步数据...", callback=log_cb)
+                _emit_route_preview(route_preview_cb, update_preview_status(current_preview, "上传中"))
                 response = upload_running_data(
                     config,
                     auth_token_for_upload,
@@ -135,17 +199,21 @@ def run_sports_upload(config, progress_callback=None, log_cb=None, stop_check_cb
 
                 if response.get('code') == 0 and response.get('data'):
                     log_output(f"第{idx}/{total_runs}条上传成功", "success", log_cb)
+                    _emit_route_preview(route_preview_cb, update_preview_status(current_preview, "上传成功"))
                     success_count += 1
                 else:
                     # 出现任何非成功情况均记录为失败但继续下一条
                     log_output(f"第{idx}/{total_runs}条上传未成功，响应: {response}", "warning", log_cb)
+                    _emit_route_preview(route_preview_cb, update_preview_status(current_preview, "上传未成功"))
                     fail_count += 1
 
             except SportsUploaderError as e:
                 log_output(f"上传失败（第{idx}/{total_runs}条）: {e}", "error", log_cb)
+                _emit_route_preview(route_preview_cb, update_preview_status(current_preview, "上传失败"))
                 fail_count += 1
             except Exception as e:
                 log_output(f"未知错误（上传第{idx}/{total_runs}条）: {e}", "error", log_cb)
+                _emit_route_preview(route_preview_cb, update_preview_status(current_preview, "上传失败"))
                 fail_count += 1
 
             log_output(f"已完成{idx}/{total_runs}", "info", log_cb)

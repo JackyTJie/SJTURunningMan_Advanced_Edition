@@ -183,11 +183,11 @@ def generate_baidu_map_html(ak="MYUXpppuOOvq99cP2AmDvplAW76VV8vr"):
 <body>
     <div id="info">
         <h3>🗺️ 路线规划器</h3>
-        <p>点击地图任意位置采集坐标点，形成跑步路线</p>
+        <p>点击地图任意位置采集坐标点，形成跑步路线。下载 txt 后，回到软件的“预设路线”下拉菜单选择“自定义...”导入。</p>
 
         <div class="control-group">
             <button onclick="clearAllMarkers()" class="clear">清空所有点</button>
-            <button onclick="exportCoordinates()" class="save">保存路线</button>
+            <button onclick="exportCoordinates()" class="save">下载路线 txt</button>
         </div>
 
         <div class="success" id="status">地图加载中...</div>
@@ -320,11 +320,11 @@ def generate_baidu_map_html(ak="MYUXpppuOOvq99cP2AmDvplAW76VV8vr"):
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
-            a.download = 'user.txt';
+            a.download = 'custom_route.txt';
             document.body.appendChild(a);
             
-            // Show instructions to save in project folder
-            statusDiv.innerHTML = '✓ 点击下面按钮下载user.txt，<br/>请将文件保存到项目根目录！ (' + coordinates.length + '个点)';
+            // Show import instructions for the desktop UI.
+            statusDiv.innerHTML = '✓ 已下载 custom_route.txt。<br/>请回到软件，在“预设路线”中选择“自定义...”导入。 (' + coordinates.length + '个点)';
             statusDiv.className = "success";
             
             // Programmatically click the link
@@ -784,13 +784,22 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
     """
     生成符合POST请求体格式的跑步数据，并整合打卡点。
     """
-    # 优先从user.txt文件读取GPS坐标，如果不存在则使用硬编码的默认路线
+    # 优先读取 UI 明确选择的路线；未提供时保留旧的 user.txt/default 兼容逻辑。
     from utils.auxiliary_util import get_base_path
     base_path = get_base_path()
 
-    # Check if a specific route file was provided in config (for CLI)
+    route_path = config.get('ROUTE_PATH')
+    if route_path:
+        route_name = config.get('ROUTE_NAME') or os.path.basename(route_path)
+        if os.path.exists(route_path):
+            log_output(f"使用选择路线: {route_name}", "info", log_cb)
+            original_coordinates = read_gps_coordinates_from_file(route_path)
+        else:
+            log_output(f"选择路线文件不存在: {route_path}，尝试默认文件", "warning", log_cb)
+            route_path = None
+
     config_route_file = config.get('ROUTE_FILE')
-    if config_route_file:
+    if not route_path and config_route_file:
         # Use the route file specified in config
         route_path = os.path.join(base_path, config_route_file)
         if os.path.exists(route_path):
@@ -807,7 +816,7 @@ def generate_running_data_payload(config, required_signpoints, point_rules_data,
             else:
                 log_output(f"使用硬编码默认路线", "info", log_cb)
                 original_coordinates = get_default_coordinates()
-    else:
+    elif not route_path:
         # Original behavior: try user.txt, fallback to hardcoded default
         user_loc_path = os.path.join(base_path, 'user.txt')
 

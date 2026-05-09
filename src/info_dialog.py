@@ -24,86 +24,103 @@ from PySide6.QtCore import QModelIndex, QEvent, QTimer, QPointF, QRectF, QSizeF,
 RESOURCES_SUB_DIR = "assets"
 
 RESOURCES_FULL_PATH = os.path.join(get_base_path(), RESOURCES_SUB_DIR)
+HELP_BACKGROUND_PATH = os.path.join(RESOURCES_FULL_PATH, "background.jpg")
 
 class Ui_HelpWindow(object):
     def setupUi(self, HelpWindow):
         if not HelpWindow.objectName():
             HelpWindow.setObjectName(u"HelpWindow")
         HelpWindow.setWindowModality(Qt.WindowModality.WindowModal)
-        HelpWindow.resize(415, 218)
-        HelpWindow.setMinimumSize(QSize(415, 218))
-        HelpWindow.setMaximumSize(QSize(415, 218))
+        HelpWindow.resize(520, 320)
+        HelpWindow.setMinimumSize(QSize(520, 320))
+        HelpWindow.setMaximumSize(QSize(520, 320))
         HelpWindow.setWindowIcon(QIcon(os.path.join(RESOURCES_FULL_PATH, "SJTURM.png")))
-        HelpWindow.setStyleSheet(u"/* 感谢语标签样式 */\n"
+        HelpWindow.setStyleSheet(u"#HelpWindow {\n"
+"	border: none;\n"
+"}\n"
+"\n"
+"#contentPanel {\n"
+"	background-color: rgba(8, 14, 24, 0.58);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.26);\n"
+"	border-radius: 22px;\n"
+"}\n"
+"\n"
 "#thankYouLabel {\n"
-"	color: #2980b9; /* 醒目的彼得里弗蓝色 */\n"
-"	font: 700 14pt \"Microsoft YaHei UI\"; /* 字体更大更突出 */\n"
+"	color: #ffffff;\n"
+"	font: 700 21pt \"Microsoft YaHei UI\";\n"
 "	background-color: transparent;\n"
+"	letter-spacing: 0px;\n"
 "}\n"
 "\n"
-"/* 信息文本标签样式 */\n"
 "#infoLabel {\n"
-"	color: #34495e; /* 深灰蓝色字体，保证清晰度 */\n"
-"	font: 700 12pt \"Microsoft YaHei UI\";\n"
-"	background-color: transparent; /* 透明背景 */\n"
+"	color: rgba(255, 255, 255, 0.90);\n"
+"	font: 500 10.5pt \"Microsoft YaHei UI\";\n"
+"	background-color: transparent;\n"
+"	line-height: 150%;\n"
 "}\n"
 "\n"
-"/* 头像标签样式 */\n"
-"#avatarLabel {\n"
-"	border-radius: 50px; /* 圆形头像的关键：半径为宽/高的一半 */\n"
-"	border: 2px solid rgba(255, 255, 255, 0.9); /* 更清晰的半透明白色边框 */\n"
+"#versionPill {\n"
+"	color: rgba(255, 255, 255, 0.92);\n"
+"	font: 700 9pt \"Microsoft YaHei UI\";\n"
+"	background-color: rgba(255, 255, 255, 0.14);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.26);\n"
+"	border-radius: 13px;\n"
+"	padding-left: 10px;\n"
+"	padding-right: 10px;\n"
 "}\n"
 "\n"
-"/* 确认按钮样式 */\n"
 "#okButton {\n"
-"	background-color: rgba(255, 255, 255, "
-                        "0.85); /* 半透明白色背景 */\n"
-"	border: 1px solid #bdc3c7; /* 柔和的灰色边框 */\n"
-"	border-radius: 15px; /* 圆角，使其呈药丸形状 */\n"
-"	color: #2c3e50; /* 深色字体，与背景形成对比 */\n"
-"	font: 700 10pt \"Microsoft YaHei UI\";\n"
+"	background-color: rgba(255, 255, 255, 0.12);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.34);\n"
+"	border-radius: 16px;\n"
+"	color: #ffffff;\n"
+"	font: 700 10.5pt \"Microsoft YaHei UI\";\n"
+"	padding: 5px 18px;\n"
 "}\n"
 "\n"
-"/* 按钮悬停效果 */\n"
 "#okButton:hover {\n"
-"	background-color: #ffffff; /* 悬停时变为不透明白色 */\n"
-"	border: 1px solid #95a5a6; /* 边框颜色加深 */\n"
+"	background-color: rgba(255, 255, 255, 0.22);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.52);\n"
 "}\n"
 "\n"
-"/* 按钮按下效果 */\n"
 "#okButton:pressed {\n"
-"	background-color: #f5f5f5; /* 按下时变为浅灰色 */\n"
-"	border: 1px solid #7f8c8d;\n"
+"	background-color: rgba(255, 255, 255, 0.16);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.42);\n"
 "}")
         self.backgroundLabel = QLabel(HelpWindow)
         self.backgroundLabel.setObjectName(u"backgroundLabel")
-        self.backgroundLabel.setGeometry(QRect(0, 0, 415, 218))
-        self.backgroundLabel.setPixmap(QPixmap(u":/resources/bg.png"))
+        self.backgroundLabel.setGeometry(QRect(0, 0, 520, 320))
+        self.backgroundLabel.setPixmap(QPixmap(HELP_BACKGROUND_PATH))
         self.backgroundLabel.setScaledContents(True)
+        self.contentPanel = QFrame(HelpWindow)
+        self.contentPanel.setObjectName(u"contentPanel")
+        self.contentPanel.setGeometry(QRect(28, 28, 464, 264))
         self.infoLabel = QLabel(HelpWindow)
         self.infoLabel.setObjectName(u"infoLabel")
-        self.infoLabel.setGeometry(QRect(20, 67, 261, 100))
+        self.infoLabel.setGeometry(QRect(58, 101, 404, 120))
         font = QFont()
         font.setFamilies([u"Microsoft YaHei UI"])
-        font.setPointSize(12)
-        font.setBold(True)
+        font.setPointSize(10)
+        font.setBold(False)
         font.setItalic(False)
         self.infoLabel.setFont(font)
         self.infoLabel.setCursor(QCursor(Qt.ArrowCursor))
         self.infoLabel.setAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
+        self.infoLabel.setWordWrap(True)
         self.avatarLabel = QLabel(HelpWindow)
         self.avatarLabel.setObjectName(u"avatarLabel")
         self.avatarLabel.setGeometry(QRect(285, 48, 100, 100))
         self.avatarLabel.setCursor(QCursor(Qt.PointingHandCursor))
-        self.avatarLabel.setPixmap(QPixmap(u":/resources/head.png"))
+        self.avatarLabel.setPixmap(QPixmap())
         self.avatarLabel.setScaledContents(True)
+        self.avatarLabel.hide()
         self.okButton = QPushButton(HelpWindow)
         self.okButton.setObjectName(u"okButton")
-        self.okButton.setGeometry(QRect(150, 168, 100, 30))
+        self.okButton.setGeometry(QRect(360, 243, 102, 32))
         self.okButton.setCursor(QCursor(Qt.PointingHandCursor))
         self.thankYouLabel = QLabel(HelpWindow)
         self.thankYouLabel.setObjectName(u"thankYouLabel")
-        self.thankYouLabel.setGeometry(QRect(55, 25, 196, 36))
+        self.thankYouLabel.setGeometry(QRect(56, 54, 290, 42))
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -111,11 +128,15 @@ class Ui_HelpWindow(object):
         self.thankYouLabel.setSizePolicy(sizePolicy)
         font1 = QFont()
         font1.setFamilies([u"Microsoft YaHei UI"])
-        font1.setPointSize(14)
+        font1.setPointSize(21)
         font1.setBold(True)
         font1.setItalic(False)
         self.thankYouLabel.setFont(font1)
-        self.thankYouLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.thankYouLabel.setAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
+        self.versionPill = QLabel(HelpWindow)
+        self.versionPill.setObjectName(u"versionPill")
+        self.versionPill.setGeometry(QRect(360, 59, 102, 26))
+        self.versionPill.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.retranslateUi(HelpWindow)
 
@@ -125,10 +146,11 @@ class Ui_HelpWindow(object):
     def retranslateUi(self, HelpWindow):
         HelpWindow.setWindowTitle(QCoreApplication.translate("HelpWindow", u"关于本工具", None))
         self.backgroundLabel.setText("")
-        self.infoLabel.setText(QCoreApplication.translate("HelpWindow", u"<html><head/><body><p>三改：Github@JackyTJie</p><p>二改：Github@accelerator-s</p><p>原作者：Github@Labyrinth0419</p><p>Version: " + config.global_version + "</p></body></html>", None))
+        self.infoLabel.setText(QCoreApplication.translate("HelpWindow", u"<html><head/><body><p>界面优化：Github@CEQ151</p><p>三改：Github@JackyTJie</p><p>二改：Github@accelerator-s</p><p>原作者：Github@Labyrinth0419</p></body></html>", None))
         self.avatarLabel.setText("")
-        self.okButton.setText(QCoreApplication.translate("HelpWindow", u"确定", None))
-        self.thankYouLabel.setText(QCoreApplication.translate("HelpWindow", u"<html><head/><body><p><span style=\" font-size:20pt;\">感谢您的使用！</span></p></body></html>", None))
+        self.okButton.setText(QCoreApplication.translate("HelpWindow", u"知道了", None))
+        self.thankYouLabel.setText(QCoreApplication.translate("HelpWindow", u"感谢您的使用", None))
+        self.versionPill.setText(QCoreApplication.translate("HelpWindow", config.global_version, None))
     # retranslateUi
 
 # --- 创建一个专门用于绘制彩带的透明遮罩层类 ---
@@ -192,7 +214,7 @@ class HelpWidget(QWidget):
         self.ui.setupUi(self)
 
         self.particles = []
-        self.background_pixmap = QPixmap(":/resources/bg.png")
+        self.background_pixmap = QPixmap(HELP_BACKGROUND_PATH)
         # 当点击关于窗口的“确定”按钮时，隐藏此窗口
         try:
             self.ui.okButton.clicked.connect(self.on_ok_clicked)
@@ -202,6 +224,7 @@ class HelpWidget(QWidget):
             except Exception:
                 pass
         self.ui.backgroundLabel.hide()
+        self.ui.avatarLabel.hide()
         self.frames_sprayed = 0
 
         # --- 创建并设置遮罩层 ---
