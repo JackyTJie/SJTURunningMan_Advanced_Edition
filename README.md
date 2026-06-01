@@ -15,6 +15,8 @@
   </p>
 </div>
 
+[![Star History Chart](https://app.repohistory.com/api/svg?repo=JackyTJie/SJTURunningMan_Advanced_Edition&type=Date&background=0D1117&color=62C3F8)](https://app.repohistory.com/star-history)
+
 ## 简介
 
 本项目仅用于学习、研究和技术测试，主要用于理解运动数据记录与上传相关的技术流程。项目作者不鼓励、不支持任何违反学校规定的使用方式。请在使用前确认自己的行为符合 SJTU 及相关平台的要求，请不要用于伪造运动数据或规避体育锻炼要求。
