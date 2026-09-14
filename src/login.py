@@ -1,13 +1,11 @@
 from time import sleep
 import requests
-import os, sys, tempfile
+import os, sys
 
 from requests.adapters import HTTPAdapter
 from requests.exceptions import RequestException
 from tenacity import retry, retry_if_exception_type, wait_fixed
 from utils.auxiliary_util import re_search, get_timestamp
-
-CAPTCHA_PATH = os.path.join(tempfile.gettempdir(), "SJTURunningMan-captcha.jpeg")
 
 # 二次验证方式
 _2FA_METHODS = {
@@ -61,20 +59,23 @@ def _get_login_page(session, url):
 def _get_captcha(session, captcha_url):
     session.get(captcha_url)
     captcha_jpeg = session.get(captcha_url)
-    with open(CAPTCHA_PATH, "wb") as f:
+    image_path = "captcha.jpeg"
+    with open(image_path, "wb") as f:
         f.write(captcha_jpeg.content)
 
 
 # 调用外部模型识别验证码
 def _identify_captcha():
     captcha_solver_url = "https://geek.sjtu.edu.cn/captcha-solver/"
-    with open(CAPTCHA_PATH, "rb") as f:
+    image_path = "captcha.jpeg"
+
+    with open(image_path, "rb") as f:
         files = {"image": ("captcha.jpg", f, "image/jpeg")}
         response = requests.post(captcha_solver_url, files=files)
 
     try:
         result = response.json().get("result")
-        os.remove(CAPTCHA_PATH)
+        os.remove("captcha.jpeg")
         return result
     except Exception:
         raise RuntimeError("验证码识别失败")
