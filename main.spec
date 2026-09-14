@@ -1,12 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
 from pathlib import Path
-
-block_cipher = None
 
 project_root = Path(SPECPATH).resolve()
 assets_dir = project_root / 'assets'
-icon_path = assets_dir / 'SJTURM.ico'
+is_mac = sys.platform == 'darwin'
+app_version = '4.3.3'
+icon_path = assets_dir / ('SJTURM.icns' if is_mac else 'SJTURM.ico')
 
 a = Analysis(
     [str(project_root / 'qtui.py')],
@@ -35,34 +36,42 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
+    excludes=['PIL', 'numpy', 'matplotlib', 'tkinter', 'scipy', 'pandas'],
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name='SJTURunningMan',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=not sys.platform == 'darwin',
     upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=None,
+    target_arch='universal2' if is_mac else None,
     codesign_identity=None,
     entitlements_file=None,
     icon=str(icon_path),
 )
+
+if is_mac:
+    app = BUNDLE(
+        exe,
+        name='SJTURunningMan.app',
+        icon=str(icon_path),
+        bundle_identifier='com.sjtu.runningman',
+        info_plist={
+            'CFBundleShortVersionString': app_version,
+            'CFBundleVersion': app_version,
+            'NSHighResolutionCapable': True,
+        },
+    )
