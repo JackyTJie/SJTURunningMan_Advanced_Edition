@@ -358,7 +358,9 @@ python -m PyInstaller --clean --noconfirm .\main.spec
 
 - **原项目作者**: [@Labyrinth0419](https://github.com/Labyrinth0419) - 创建了优秀的原项目，后续加入交我办登陆功能
 - **原增强版作者**: [@accelerator-s](https://github.com/accelerator-s) - 添加了新功能和改进以及对异地的修复
-- **热心参与贡献的同学**：[@CEQ151](https://github.com/CEQ151) - 优化电脑版图形界面和Readme
+- **热心同学A**：[@CEQ151](https://github.com/CEQ151) - 优化电脑版图形界面和Readme
+- **热心同学B**：[@AetherWish](https://github.com/AetherWish) - 贡献了鸿蒙版源码
+- **热心同学C**：[@tangyang0](https://github.com/tangyang0) - 修复了在Mac上的Bug
 
 ## 免责声明
 
@@ -366,4 +368,4 @@ python -m PyInstaller --clean --noconfirm .\main.spec
 
 ---
 
-**Last Update: Saturday, May 9, 2026**
+**Last Update: Saturday, Sep 15, 2026**
