@@ -120,6 +120,9 @@ def get_resource_path(relative_path):
 
 RESOURCES_FULL_PATH = get_resource_path(RESOURCES_SUB_DIR)
 APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM.ico"))
+if sys.platform == "darwin":
+    # Rounded-corner icon for the macOS Dock; Qt uses windowIcon as the dock tile.
+    APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM_rounded.png"))
 if not os.path.exists(APP_ICON_PATH):
     APP_ICON_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "SJTURM.png"))
 MAIN_BACKGROUND_PATH = get_resource_path(os.path.join(RESOURCES_SUB_DIR, "mainBackground.jpeg"))
