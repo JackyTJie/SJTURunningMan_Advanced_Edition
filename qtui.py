@@ -1734,14 +1734,14 @@ class SportsUploaderUI(QWidget):
         """打开路线规划器"""
         try:
             # 将导入移到方法开头，避免作用域问题
-            from src.data_generator import generate_baidu_map_html
+            from src.data_generator import generate_route_planner_html
             import os
             import webbrowser
 
             # Inform user about the route planning process
             reply = QMessageBox.question(self, "路线规划", 
                                     "此功能将启动路线规划器，您可以：\n\n"
-                                    "1. 在浏览器中打开百度地图\n"
+                                    "1. 在浏览器中打开在线地图（OpenStreetMap）\n"
                                     "2. 点击地图采集坐标点形成路线\n"
                                     "3. 点击\"下载路线 txt\"保存路线文件\n"
                                     "4. 回到软件，在\"预设路线\"中选择\"自定义...\"导入该 txt\n\n"
@@ -1751,9 +1751,9 @@ class SportsUploaderUI(QWidget):
                                     QMessageBox.StandardButton.Yes)
 
             if reply == QMessageBox.StandardButton.Yes:
-                # Generate the route planner HTML with the provided API key
+                # Generate the route planner HTML (Leaflet + OpenStreetMap, no API key)
                 try:
-                    map_path = generate_baidu_map_html()
+                    map_path = generate_route_planner_html()
                     webbrowser.open(f'file://{os.path.abspath(map_path)}')
                     
                     QMessageBox.information(self, "路线规划器", 

@@ -1,10 +1,10 @@
 import html
 import json
 
+from src.data_generator import _COORD_TRANSFORM_JS
 from utils.auxiliary_util import haversine_distance
 
 
-BAIDU_MAP_AK = "MYUXpppuOOvq99cP2AmDvplAW76VV8vr"
 JUMP_THRESHOLD_METERS = 150.0
 UPLOAD_LONGITUDE_OFFSET = -0.00651271494735 + 0.000094
 UPLOAD_LATITUDE_OFFSET = -0.00560888976477 - 0.000700
@@ -149,7 +149,8 @@ def format_preview_summary(preview):
     return f"{prefix}{distance_km:.2f}km / {point_count}点 / {jump_count}处跳段{risk_part} / {status}"
 
 
-def generate_route_preview_html(preview, baidu_ak=BAIDU_MAP_AK):
+def generate_route_preview_html(preview):
+    """生成 Leaflet + OpenStreetMap 路线预览页面（无百度 AK 依赖）。"""
     points = preview.get("points", []) if preview else []
     jumps = preview.get("jump_segments", []) if preview else []
     stats = preview.get("stats", {}) if preview else {}
@@ -168,21 +169,22 @@ def generate_route_preview_html(preview, baidu_ak=BAIDU_MAP_AK):
     else:
         risk_text = "未检测"
 
-    return f"""<!DOCTYPE html>
+    template = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>实际上传路线预览</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
-        html, body, #map {{
+        html, body, #map {
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
             font-family: Arial, "Microsoft YaHei", sans-serif;
-        }}
-        #panel {{
+        }
+        #panel {
             position: absolute;
             top: 12px;
             right: 12px;
@@ -196,19 +198,19 @@ def generate_route_preview_html(preview, baidu_ak=BAIDU_MAP_AK):
             color: #172033;
             font-size: 13px;
             line-height: 1.5;
-        }}
-        #panel h1 {{
+        }
+        #panel h1 {
             margin: 0 0 8px;
             font-size: 15px;
-        }}
-        #panel .muted {{
+        }
+        #panel .muted {
             color: #667085;
-        }}
-        #panel .warn {{
+        }
+        #panel .warn {
             color: #b42318;
             font-weight: 700;
-        }}
-        #empty {{
+        }
+        #empty {
             display: none;
             position: absolute;
             inset: 0;
@@ -217,7 +219,7 @@ def generate_route_preview_html(preview, baidu_ak=BAIDU_MAP_AK):
             color: #475467;
             background: #f8fafc;
             font-size: 16px;
-        }}
+        }
     </style>
 </head>
 <body>
@@ -225,64 +227,87 @@ def generate_route_preview_html(preview, baidu_ak=BAIDU_MAP_AK):
     <div id="empty">暂无可预览路线</div>
     <div id="panel">
         <h1>实际上传路线</h1>
-        <div class="muted">{safe_summary}</div>
-        <div>状态：{safe_status}</div>
-        <div>距离：{distance_km:.2f} km</div>
-        <div>时长：{duration_min:.1f} min</div>
-        <div>点数：{stats.get("point_count", 0)} 个</div>
-        <div>起终点距离：{stats.get("start_end_m", 0.0):.1f} m</div>
-        <div class="warn">跳段：{stats.get("jump_count", 0)} 处，最长 {stats.get("max_segment_m", 0.0):.1f} m</div>
-        <div>风险：{html.escape(risk_text)}</div>
-        <div class="muted">地图显示已反向应用 GPS 校正，统计仍按上传坐标计算。</div>
+        <div class="muted">__SUMMARY__</div>
+        <div>状态：__STATUS__</div>
+        <div>距离：__DISTANCE__ km</div>
+        <div>时长：__DURATION__ min</div>
+        <div>点数：__COUNT__ 个</div>
+        <div>起终点距离：__STARTEND__ m</div>
+        <div class="warn">跳段：__JUMPS__ 处，最长 __MAXSEG__ m</div>
+        <div>风险：__RISK__</div>
+        <div class="muted">地图显示已反向应用 GPS 校正并转为 WGS84 渲染，统计仍按上传坐标计算。</div>
     </div>
-    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak={html.escape(baidu_ak)}"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        var routePoints = {data_json};
-        var jumpSegments = {jumps_json};
+__TRANSFORM_JS__
+        var routePoints = __DATA__;
+        var jumpSegments = __JUMPSDATA__;
 
-        if (!routePoints || routePoints.length < 2) {{
+        function toWgs(lng, lat) {
+            return bd09ToWgs84(lng, lat);
+        }
+
+        if (!routePoints || routePoints.length < 2) {
             document.getElementById("empty").style.display = "flex";
-        }} else {{
-            var map = new BMap.Map("map");
-            var bPoints = routePoints.map(function(p) {{
-                return new BMap.Point(p.display_lng || p.lng, p.display_lat || p.lat);
-            }});
-            map.centerAndZoom(bPoints[0], 16);
-            map.enableScrollWheelZoom(true);
-            map.addControl(new BMap.NavigationControl());
-            map.addControl(new BMap.ScaleControl());
-            map.addControl(new BMap.MapTypeControl());
+        } else {
+            var map = L.map("map");
+            L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
 
-            var routeLine = new BMap.Polyline(bPoints, {{
-                strokeColor: "#2563eb",
-                strokeWeight: 5,
-                strokeOpacity: 0.82
-            }});
-            map.addOverlay(routeLine);
+            var latlngs = routePoints.map(function(p) {
+                var w = toWgs(p.display_lng || p.lng, p.display_lat || p.lat);
+                return [w.lat, w.lng];
+            });
 
-            jumpSegments.forEach(function(seg) {{
-                var jumpLine = new BMap.Polyline([
-                    new BMap.Point((seg.display_from || seg.from).lng, (seg.display_from || seg.from).lat),
-                    new BMap.Point((seg.display_to || seg.to).lng, (seg.display_to || seg.to).lat)
-                ], {{
-                    strokeColor: "#dc2626",
-                    strokeWeight: 6,
-                    strokeOpacity: 0.9
-                }});
-                map.addOverlay(jumpLine);
-            }});
+            var routeLine = L.polyline(latlngs, {
+                color: "#2563eb",
+                weight: 5,
+                opacity: 0.82
+            }).addTo(map);
 
-            var startMarker = new BMap.Marker(bPoints[0]);
-            var endMarker = new BMap.Marker(bPoints[bPoints.length - 1]);
-            map.addOverlay(startMarker);
-            map.addOverlay(endMarker);
-            startMarker.setTitle("起点");
-            endMarker.setTitle("终点");
-            map.setViewport(bPoints, {{ margins: [70, 360, 40, 40] }});
-        }}
+            jumpSegments.forEach(function(seg) {
+                var from = seg.display_from || seg.from;
+                var to = seg.display_to || seg.to;
+                var wf = toWgs(from.lng, from.lat);
+                var wt = toWgs(to.lng, to.lat);
+                L.polyline([[wf.lat, wf.lng], [wt.lat, wt.lng]], {
+                    color: "#dc2626",
+                    weight: 6,
+                    opacity: 0.9
+                }).addTo(map);
+            });
+
+            L.circleMarker(latlngs[0], { radius: 7, color: "#16a34a", fillOpacity: 0.9 }).addTo(map).bindTooltip("起点", { direction: "top" });
+            L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, color: "#dc2626", fillOpacity: 0.9 }).addTo(map).bindTooltip("终点", { direction: "top" });
+            L.control.scale({ imperial: false }).addTo(map);
+            map.fitBounds(routeLine.getBounds(), { paddingTopLeft: [40, 70], paddingBottomRight: [360, 40] });
+        }
     </script>
 </body>
 </html>"""
+
+    replacements = {
+        "__SUMMARY__": safe_summary,
+        "__STATUS__": safe_status,
+        "__DISTANCE__": f"{distance_km:.2f}",
+        "__DURATION__": f"{duration_min:.1f}",
+        "__COUNT__": str(stats.get("point_count", 0)),
+        "__STARTEND__": f"{stats.get('start_end_m', 0.0):.1f}",
+        "__JUMPS__": str(stats.get("jump_count", 0)),
+        "__MAXSEG__": f"{stats.get('max_segment_m', 0.0):.1f}",
+        "__RISK__": html.escape(risk_text),
+        "__TRANSFORM_JS__": _COORD_TRANSFORM_JS,
+        "__DATA__": data_json,
+        "__JUMPSDATA__": jumps_json,
+    }
+    page = template
+    for token in ("__SUMMARY__", "__STATUS__", "__DISTANCE__", "__DURATION__", "__COUNT__",
+                  "__STARTEND__", "__MAXSEG__", "__RISK__", "__TRANSFORM_JS__", "__DATA__",
+                  "__JUMPSDATA__", "__JUMPS__"):
+        page = page.replace(token, replacements[token])
+    return page
 
 
 def _track_count(payload):
