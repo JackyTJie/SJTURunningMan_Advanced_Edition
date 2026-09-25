@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QSpacerItem, QFileDialog, QDialog, QFrame, QGraphicsDropShadowEffect
 )
 from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap
+from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap, QLinearGradient
 
 from src.main import run_sports_upload
 from src.data_generator import generate_running_data_payload
@@ -1088,10 +1088,15 @@ class SportsUploaderUI(QWidget):
             x = (self.width() - scaled.width()) // 2
             y = (self.height() - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
+
+            # 渐变暗化遮罩：背景只作氛围，第一眼看到的应是前景 UI
+            overlay = QLinearGradient(0, 0, 0, max(1, self.height()))
+            overlay.setColorAt(0.0, QColor(3, 12, 20, 209))   # rgba(3, 12, 20, 0.82)
+            overlay.setColorAt(1.0, QColor(3, 12, 20, 224))   # rgba(3, 12, 20, 0.88)
+            painter.fillRect(self.rect(), overlay)
         else:
             painter.fillRect(self.rect(), QColor(7, 16, 19))
 
-        painter.fillRect(self.rect(), QColor(5, 12, 15, 142))
         super().paintEvent(event)
 
     def resizeEvent(self, event):
