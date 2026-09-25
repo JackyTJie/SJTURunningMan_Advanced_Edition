@@ -841,6 +841,43 @@ class SportsUploaderUI(QWidget):
             except Exception:
                 coords = []
         self.route_shape_widget.set_coordinates(coords)
+        self.update_delete_route_button()
+
+    def _selected_route_is_imported(self):
+        route_path = self.route_combo.currentData()
+        if not isinstance(route_path, str) or not route_path:
+            return False
+        routes_dir = os.path.abspath(self.get_user_routes_dir())
+        return os.path.dirname(os.path.abspath(route_path)) == routes_dir
+
+    def update_delete_route_button(self):
+        if hasattr(self, "delete_route_button"):
+            self.delete_route_button.setEnabled(self._selected_route_is_imported())
+
+    def delete_selected_route(self):
+        """删除选中的已导入路线文件并回退到默认路线。"""
+        if not self._selected_route_is_imported():
+            return
+
+        route_path = self.route_combo.currentData()
+        reply = QMessageBox.question(
+            self,
+            "删除路线",
+            f"确定删除已导入路线文件？\n{os.path.basename(route_path)}\n\n文件删除后不可恢复（可重新导入），选择将回退到默认路线。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            os.remove(route_path)
+            self.log_output_text(f"已删除导入路线: {os.path.basename(route_path)}", "info")
+        except OSError as e:
+            QMessageBox.warning(self, "删除路线失败", str(e))
+            return
+
+        self.populate_route_combo()
 
     def init_ui(self):
         top_h_layout = QHBoxLayout()
@@ -1091,8 +1128,20 @@ class SportsUploaderUI(QWidget):
         self.route_combo.setToolTip("选择本次生成记录使用的路线。")
         self.populate_route_combo()
         self.route_combo.currentIndexChanged.connect(self.on_route_combo_changed)
-        route_layout.addWidget(self.route_combo)
-        route_layout.addWidget(self.create_hint_label("内置路线暂仅保留 default；其他路线待校验后恢复，也可选择“自定义...”导入 txt。"))
+
+        self.delete_route_button = GlowButton("删除", glow_color=QColor(255, 82, 153, 190))
+        self.delete_route_button.setObjectName("deleteRouteButton")
+        self.delete_route_button.setFixedWidth(64)
+        self.delete_route_button.setToolTip("删除当前选中的已导入路线文件；内置 default 和旧版 user.txt 不可删除。")
+        self.delete_route_button.setEnabled(False)
+        self.delete_route_button.clicked.connect(self.delete_selected_route)
+
+        route_input_layout = QHBoxLayout()
+        route_input_layout.setSpacing(8)
+        route_input_layout.addWidget(self.route_combo, 1)
+        route_input_layout.addWidget(self.delete_route_button)
+        route_layout.addLayout(route_input_layout)
+        route_layout.addWidget(self.create_hint_label("内置路线暂仅保留 default；其他路线待校验后恢复，也可选择“自定义...”导入 txt，导入后可用“删除”移除。"))
 
         run_settings_layout.addLayout(route_layout)
 
