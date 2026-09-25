@@ -980,12 +980,12 @@ class SportsUploaderUI(QWidget):
         distance_input_layout = QHBoxLayout()
         self.run_distance_input = QLineEdit()
         self.run_distance_input.setText("4")
-        self.run_distance_input.setPlaceholderText("1-4，单位 km")
+        self.run_distance_input.setPlaceholderText("1-5，单位 km")
         self.run_distance_input.setMaxLength(3)
-        self.run_distance_input.setToolTip("每条记录的目标跑步距离，最多 4km。")
+        self.run_distance_input.setToolTip("每条记录的目标跑步距离，最多 5km。")
         distance_input_layout.addWidget(self.run_distance_input)
         distance_layout.addLayout(distance_input_layout)
-        distance_layout.addWidget(self.create_hint_label("单位 km，最多 4km。"))
+        distance_layout.addWidget(self.create_hint_label("单位 km，最多 5km。"))
 
         second_settings_row = QHBoxLayout()
         second_settings_row.setSpacing(14)
@@ -1152,8 +1152,8 @@ class SportsUploaderUI(QWidget):
                 run_distance_km = float(run_distance_text)
             except ValueError:
                 raise ValueError("距离应为数字，单位 km，例如 3 或 4")
-            if not (0 < run_distance_km <= 4):
-                raise ValueError("距离应大于 0 且不超过 4km")
+            if not (0 < run_distance_km <= 5):
+                raise ValueError("距离应大于 0 且不超过 5km")
             if run_distance_km.is_integer():
                 run_distance_km = int(run_distance_km)
 
