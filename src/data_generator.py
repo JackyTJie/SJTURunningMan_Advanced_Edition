@@ -651,19 +651,19 @@ def adjust_path_for_speed(coordinates, target_speed_mps, target_distance_m, inte
                 current_distance = single_loop_distance
                 
                 # Add more loops as needed
-                while current_distance < target_distance:
+                while current_distance < compensated_target_distance:
                     reverse_coordinates = detailed_coordinates[::-1]
                     for i in range(len(reverse_coordinates) - 1):
                         lon1, lat1 = reverse_coordinates[i]
                         lon2, lat2 = reverse_coordinates[i + 1]
                         seg_distance = haversine_distance(lat1, lon1, lat2, lon2)
 
-                        if current_distance + seg_distance <= target_distance:
+                        if current_distance + seg_distance <= compensated_target_distance:
                             if not adjusted_coordinates or adjusted_coordinates[-1] != (lon1, lat1):
                                 adjusted_coordinates.append((lon1, lat1))
                             current_distance += seg_distance
                         else:
-                            remaining_dist_in_seg = target_distance - current_distance
+                            remaining_dist_in_seg = compensated_target_distance - current_distance
                             if seg_distance > 0:
                                 fraction = remaining_dist_in_seg / seg_distance
                                 final_lat = lat1 + fraction * (reverse_coordinates[i + 1][1] - lat1)
@@ -671,7 +671,7 @@ def adjust_path_for_speed(coordinates, target_speed_mps, target_distance_m, inte
                                 adjusted_coordinates.append((final_lon, final_lat))
                             break
                     
-                    if current_distance >= target_distance:
+                    if current_distance >= compensated_target_distance:
                         break
                         
                     for i in range(len(detailed_coordinates) - 1):
@@ -679,12 +679,12 @@ def adjust_path_for_speed(coordinates, target_speed_mps, target_distance_m, inte
                         lon2, lat2 = detailed_coordinates[i + 1]
                         seg_distance = haversine_distance(lat1, lon1, lat2, lon2)
 
-                        if current_distance + seg_distance <= target_distance:
+                        if current_distance + seg_distance <= compensated_target_distance:
                             if not adjusted_coordinates or adjusted_coordinates[-1] != (lon1, lat1):
                                 adjusted_coordinates.append((lon1, lat1))
                             current_distance += seg_distance
                         else:
-                            remaining_dist_in_seg = target_distance - current_distance
+                            remaining_dist_in_seg = compensated_target_distance - current_distance
                             if seg_distance > 0:
                                 fraction = remaining_dist_in_seg / seg_distance
                                 final_lat = lat1 + fraction * (lat2 - lat1)
