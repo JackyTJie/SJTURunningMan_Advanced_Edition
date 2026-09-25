@@ -1,17 +1,21 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>路线规划器</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
-        body, html, #map-container {
+        body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100vh;
             overflow: hidden;
             font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
         }
         #info {
             position: absolute;
@@ -112,60 +116,122 @@
             </div>
         </div>
     </div>
-    <div id="map-container"></div>
+    <div id="map"></div>
 
-    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=MYUXpppuOOvq99cP2AmDvplAW76VV8vr"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // 初始化地图
-        var map = new BMap.Map("map-container");
+
+    // 坐标系统一说明：OSM 瓦片为 WGS84；导出/旧路线文件为百度 BD09；上传前由软件端平移校正为高德/腾讯 GCJ02。
+    // 本页面在点击处（WGS84）实时转成 BD09 保存，保证与旧路线及上传流程完全兼容。
+    var PI = 3.1415926535897932384626;
+    var X_PI = PI * 3000.0 / 180.0;
+    function outOfChina(lng, lat) {
+        return !(72.004 <= lng && lng <= 137.8347 && 0.8293 <= lat && lat <= 55.8271);
+    }
+    function transformLat(x, y) {
+        var r = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+        r += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0;
+        r += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0;
+        r += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0;
+        return r;
+    }
+    function transformLng(x, y) {
+        var r = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+        r += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0;
+        r += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0;
+        r += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0;
+        return r;
+    }
+    function wgs84ToGcj02(lng, lat) {
+        if (outOfChina(lng, lat)) return { lng: lng, lat: lat };
+        var a = 6378245.0, ee = 0.00669342162296594323;
+        var dLat = transformLat(lng - 105.0, lat - 35.0);
+        var dLng = transformLng(lng - 105.0, lat - 35.0);
+        var radLat = lat / 180.0 * PI;
+        var magic = Math.sin(radLat);
+        magic = 1 - ee * magic * magic;
+        var sqrtMagic = Math.sqrt(magic);
+        dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI);
+        dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI);
+        return { lng: lng + dLng, lat: lat + dLat };
+    }
+    function gcj02ToWgs84(lng, lat) {
+        if (outOfChina(lng, lat)) return { lng: lng, lat: lat };
+        var g = wgs84ToGcj02(lng, lat);
+        return { lng: lng * 2 - g.lng, lat: lat * 2 - g.lat };
+    }
+    function gcj02ToBd09(lng, lat) {
+        var z = Math.sqrt(lng * lng + lat * lat) + 0.00002 * Math.sin(lat * X_PI);
+        var theta = Math.atan2(lat, lng) + 0.000003 * Math.cos(lng * X_PI);
+        return { lng: z * Math.cos(theta) + 0.0065, lat: z * Math.sin(theta) + 0.006 };
+    }
+    function bd09ToGcj02(lng, lat) {
+        var x = lng - 0.0065, y = lat - 0.006;
+        var z = Math.sqrt(x * x + y * y) - 0.00002 * Math.sin(y * X_PI);
+        var theta = Math.atan2(y, x) - 0.000003 * Math.cos(x * X_PI);
+        return { lng: z * Math.cos(theta), lat: z * Math.sin(theta) };
+    }
+    function wgs84ToBd09(lng, lat) {
+        var g = wgs84ToGcj02(lng, lat);
+        return gcj02ToBd09(g.lng, g.lat);
+    }
+    function bd09ToWgs84(lng, lat) {
+        var g = bd09ToGcj02(lng, lat);
+        return gcj02ToWgs84(g.lng, g.lat);
+    }
+
+        // 初始化地图（OpenStreetMap 瓦片）
+        var map = L.map('map');
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
         var statusDiv = document.getElementById('status');
         var coordinateList = document.getElementById('coordinate-list');
 
-        // 设置中心点（上海交通大学闵行校区附近）
-        var point = new BMap.Point(121.442938, 31.031599);
-        map.centerAndZoom(point, 15);
+        // 设置中心点（上海交通大学闵行校区，百度坐标转 WGS84）
+        var center = bd09ToWgs84(121.442938, 31.031599);
+        map.setView([center.lat, center.lng], 15);
+        statusDiv.innerHTML = "✓ 地图加载成功，点击地图开始采集坐标";
+        statusDiv.className = "success";
 
-        // 启用滚轮缩放
-        map.enableScrollWheelZoom(true);
-
-        // 存储坐标的数组
+        // 存储坐标的数组（lng/lat 为导出用的 BD09，wlng/wlat 为点击处的 WGS84）
         var coordinates = [];
         var markers = [];
 
-        // 地图加载成功回调
-        map.addEventListener("tilesloaded", function() {
-            statusDiv.innerHTML = "✓ 地图加载成功，点击地图开始采集坐标";
-            statusDiv.className = "success";
-        });
-
         // 添加地图点击事件
-        map.addEventListener("click", function(e) {
-            var lng = e.point.lng;
-            var lat = e.point.lat;
+        map.on('click', function(e) {
+            var wlng = e.latlng.lng;
+            var wlat = e.latlng.lat;
+            var bd = wgs84ToBd09(wlng, wlat);
 
-            // 保存坐标
             var coord = {
-                lng: lng,
-                lat: lat,
+                lng: bd.lng,
+                lat: bd.lat,
+                wlng: wlng,
+                wlat: wlat,
                 timestamp: Date.now()
             };
             coordinates.push(coord);
 
             // 在点击位置添加标记
-            var marker = new BMap.Marker(e.point);
-            map.addOverlay(marker);
+            var marker = L.marker([wlat, wlng]).addTo(map);
+            marker.bindTooltip(
+                '经度: ' + bd.lng.toFixed(6) + '<br/>纬度: ' + bd.lat.toFixed(6) +
+                '<br/><small>点击标记可删除</small>',
+                { direction: 'top' }
+            );
             markers.push(marker);
 
-            // 添加标记点击事件（删除标记）
-            marker.addEventListener("click", function() {
-                map.removeOverlay(marker);
-                // 从坐标数组中移除
-                var index = coordinates.findIndex(c =>
-                    Math.abs(c.lng - lng) < 0.000001 && Math.abs(c.lat - lat) < 0.000001);
+            // 点击标记删除该点
+            marker.on('click', function() {
+                map.removeLayer(marker);
+                var index = coordinates.findIndex(function(c) {
+                    return Math.abs(c.lng - coord.lng) < 0.000001 && Math.abs(c.lat - coord.lat) < 0.000001;
+                });
                 if (index > -1) {
                     coordinates.splice(index, 1);
                 }
-                // 从标记数组中移除
                 var markerIndex = markers.indexOf(marker);
                 if (markerIndex > -1) {
                     markers.splice(markerIndex, 1);
@@ -173,14 +239,6 @@
                 updateCoordinateList();
             });
 
-            // 显示坐标信息
-            var infoWindow = new BMap.InfoWindow(
-                "经度: " + lng.toFixed(6) + "<br/>纬度: " + lat.toFixed(6) +
-                "<br/><small>点击标记可删除</small>"
-            );
-            marker.openInfoWindow(infoWindow);
-
-            // 更新坐标列表显示
             updateCoordinateList();
         });
 
@@ -206,9 +264,8 @@
 
         // 清空所有标记
         function clearAllMarkers() {
-            // 移除所有标记
             markers.forEach(function(marker) {
-                map.removeOverlay(marker);
+                map.removeLayer(marker);
             });
             markers = [];
             coordinates = [];
@@ -217,7 +274,7 @@
             statusDiv.className = "success";
         }
 
-        // 导出坐标为文件
+        // 导出坐标为文件（BD09 百度经纬度，与旧版一致）
         function exportCoordinates() {
             if (coordinates.length < 2) {
                 alert("请至少选择2个坐标点！");
@@ -236,24 +293,18 @@
             a.href = url;
             a.download = 'custom_route.txt';
             document.body.appendChild(a);
-            
+
             // Show import instructions for the desktop UI.
             statusDiv.innerHTML = '✓ 已下载 custom_route.txt。<br/>请回到软件，在“预设路线”中选择“自定义...”导入。 (' + coordinates.length + '个点)';
             statusDiv.className = "success";
-            
+
             // Programmatically click the link
             a.click();
-            
+
             // Clean up
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-
-        // 添加缩放控件
-        map.addControl(new BMap.NavigationControl());
-        map.addControl(new BMap.ScaleControl());
-        map.addControl(new BMap.MapTypeControl());
     </script>
 </body>
 </html>
-    

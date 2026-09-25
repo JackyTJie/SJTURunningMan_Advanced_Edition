@@ -11,7 +11,7 @@
     <img alt="Android" src="https://img.shields.io/badge/Android-v4.2.0-3DDC84?logo=android&amp;logoColor=white" />
     <img alt="Route Import" src="https://img.shields.io/badge/Routes-Default%20%2B%20Import-2A6F97" />
     <img alt="Risk Check" src="https://img.shields.io/badge/Risk%20Check-Enabled-0F766E" />
-    <img alt="Route Preview" src="https://img.shields.io/badge/Route%20Preview-Baidu%20Map-D97706" />
+    <img alt="Route Preview" src="https://img.shields.io/badge/Route%20Preview-OpenStreetMap-D97706" />
   </p>
 </div>
 
@@ -23,7 +23,7 @@
 
 Windows 版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。程序默认会以昨日作为结束日期，向前生成指定次数的跑步记录（默认为1次），每次跑步4km，时间为08:00:00。
 
-> p.s. 软件的地图自定义路线功能，基于从百度地图获取的免费API开发，现在的API使用时间略长（超过半年）可能会受到限制或者封禁，届时自定义路线功能可能无法使用。
+> p.s. 软件的地图自定义路线功能已迁移至 Leaflet + OpenStreetMap，不再依赖百度地图 AK，不存在 API Key 被封禁的问题。导出的路线坐标仍为百度 BD09 经纬度，与旧路线文件及上传坐标校正完全兼容。
 
 <img src="assets/Sample.png" alt="Windows main UI preview" style="zoom: 33%;" />
 
@@ -45,7 +45,7 @@ Windows 版提供跑步次数、时间、距离和路线等参数配置，便于
 - **Windows UI 继续整理** - 上传设置改为紧凑双列表单，减少滚动；顶部增加 GitHub 仓库和水源讨论帖入口
 - **启动承诺书** - 打开软件时需阅读并勾选承诺书，确认不会用于违规操作后才可进入主界面
 - **轨迹风险指数自检** - 每条 payload 生成后、上传前自动检测采样规律性、速度稳定性、线性插值痕迹、GPS 异常、重复路线和停顿状态一致性
-- **实际上传路线预览** - 新增“路线预览”区域和“查看本次路线”按钮，展示真实 payload 坐标生成的百度地图预览
+- **实际上传路线预览** - 新增“路线预览”区域和“查看本次路线”按钮，展示真实 payload 坐标生成的 OpenStreetMap 预览
 - **内置路线收敛** - 内置路线暂仅保留 `default.txt`；待校验路线已移入 `assets/Routes/NeedsReview/`
 - **路线选择升级** - “预设路线”下拉菜单支持 `default.txt`、旧版 `user.txt` 和外部 txt 路线导入
 - **自定义路线持久化** - 通过“自定义...”导入的 txt 会复制到 exe 同目录 `Routes/` 文件夹，重启后仍可选择；同名文件自动追加序号
@@ -120,7 +120,7 @@ Windows 版提供跑步次数、时间、距离和路线等参数配置，便于
 **图形化路线自定义:**
 
 - 点击"设计/更新路线"按钮打开路线规划器
-- 在百度地图界面中点击选择路径坐标点，形成跑步路线
+- 在 OpenStreetMap 地图界面中点击选择路径坐标点，形成跑步路线
 - 支持添加、删除、清空坐标点
 - 点击"下载路线 txt"按钮将下载 `custom_route.txt` 文件
 - 回到 Windows 主界面，在"预设路线"下拉菜单中选择"自定义..."并导入该 txt 文件
