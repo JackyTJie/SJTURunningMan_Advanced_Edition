@@ -357,6 +357,7 @@ python -m PyInstaller --clean --noconfirm .\main.spec
 - **热心同学A**：[@CEQ151](https://github.com/CEQ151) - 优化电脑版图形界面和Readme
 - **热心同学B**：[@AetherWish](https://github.com/AetherWish) - 贡献了鸿蒙版源码
 - **热心同学C**：[@tangyang0](https://github.com/tangyang0) - 修复了在Mac上的Bug
+- **热心同学D**：[@dajiaohuang](https://github.com/dajiaohuang) - 修复变量未定义Bug
 
 ## 免责声明
 
