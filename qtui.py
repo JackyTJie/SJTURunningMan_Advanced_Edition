@@ -292,24 +292,24 @@ class SportsUploaderUI(QWidget):
 
             #appTitle {
                 color: rgb(255, 255, 252);
-                font-size: 17pt;
+                font-size: 20pt;
                 font-weight: 800;
                 background-color: transparent;
             }
 
             #sectionHint {
                 color: rgba(229, 246, 240, 210);
-                font-size: 8pt;
+                font-size: 9pt;
                 background-color: transparent;
             }
 
             #floatingHint {
                 color: rgba(255, 255, 252, 224);
-                font-size: 8pt;
+                font-size: 9pt;
                 background-color: rgba(8, 14, 24, 118);
                 border: 1px solid rgba(72, 255, 215, 82);
                 border-radius: 7px;
-                padding: 7px 9px;
+                padding: 6px 8px;
             }
 
             #warningBox {
@@ -317,20 +317,20 @@ class SportsUploaderUI(QWidget):
                 color: rgb(255, 241, 205);
                 border: 1px solid rgba(255, 204, 95, 154);
                 border-radius: 8px;
-                padding: 18px;
-                font-size: 10pt;
+                padding: 14px;
+                font-size: 11pt;
                 font-weight: 600;
                 line-height: 145%;
             }
-            
+
             /* GroupBox 样式 */
             QGroupBox {
-                font-size: 10pt;
+                font-size: 12pt;
                 font-weight: bold;
                 margin-top: 0;
                 border: 1px solid rgba(78, 255, 216, 72);
                 border-radius: 8px;
-                padding: 32px 15px 15px 15px;
+                padding: 36px 12px 12px 12px;
                 color: rgb(225, 255, 248);
                 background-color: rgba(6, 14, 22, 166);
             }
@@ -338,8 +338,8 @@ class SportsUploaderUI(QWidget):
                 subcontrol-origin: padding;
                 subcontrol-position: top left;
                 left: 12px;
-                top: 7px;
-                padding: 3px 12px;
+                top: 8px;
+                padding: 4px 12px;
                 color: rgb(232, 255, 248);
                 background-color: rgba(11, 28, 34, 210);
                 border: 1px solid rgba(88, 255, 220, 124);
@@ -350,17 +350,17 @@ class SportsUploaderUI(QWidget):
             QLabel {
                 color: rgb(235, 247, 243);
                 background-color: transparent;
-                font-size: 9pt;
+                font-size: 11pt;
             }
-            
+
             QLineEdit, QComboBox, QDateTimeEdit {
                 background-color: rgba(6, 18, 27, 188);
                 border: 1px solid rgba(94, 255, 223, 104);
                 border-radius: 6px;
-                padding: 8px;
+                padding: 9px;
                 color: rgb(239, 255, 250);
-                font-size: 9pt;
-                min-height: 20px;
+                font-size: 11pt;
+                min-height: 22px;
                 selection-background-color: rgb(75, 255, 218);
                 selection-color: rgb(4, 20, 23);
                 placeholder-text-color: rgba(226, 244, 238, 154);
@@ -397,7 +397,7 @@ class SportsUploaderUI(QWidget):
                 padding: 6px;
             }
             QComboBox QAbstractItemView::item {
-                min-height: 28px;
+                min-height: 32px;
                 padding: 6px 8px;
             }
             QComboBox QAbstractItemView::item:hover {
@@ -413,9 +413,10 @@ class SportsUploaderUI(QWidget):
                 color: rgb(240, 255, 250);
                 border: 1px solid rgba(91, 255, 222, 78);
                 border-radius: 6px;
-                padding: 8px 16px;
-                min-height: 24px;
-                max-height: 36px;
+                padding: 10px 18px;
+                min-height: 26px;
+                max-height: 44px;
+                font-size: 11pt;
                 font-weight: 600;
             }
             QPushButton:hover {
@@ -438,7 +439,8 @@ class SportsUploaderUI(QWidget):
                 text-align: center;
                 background-color: rgba(5, 15, 23, 186);
                 color: rgb(226, 255, 248);
-                max-height: 20px;
+                max-height: 24px;
+                font-size: 10pt;
                 font-weight: 700;
             }
             QProgressBar::chunk {
@@ -484,6 +486,8 @@ class SportsUploaderUI(QWidget):
                 background-color: rgba(11, 116, 104, 226);
                 color: white;
                 border: 1px solid rgba(69, 255, 214, 174);
+                font-size: 13pt;
+                font-weight: 700;
             }
             #startButton:hover {
                 background-color: rgba(15, 158, 136, 236);
@@ -496,6 +500,7 @@ class SportsUploaderUI(QWidget):
                 background-color: rgba(159, 42, 67, 225);
                 color: white;
                 border: 1px solid rgba(255, 82, 153, 174);
+                font-size: 12pt;
             }
             #stopButton:hover {
                 background-color: rgba(196, 49, 92, 236);
@@ -771,7 +776,7 @@ class SportsUploaderUI(QWidget):
 
     def init_ui(self):
         top_h_layout = QHBoxLayout()
-        top_h_layout.setContentsMargins(20, 20, 20, 20)
+        top_h_layout.setContentsMargins(12, 12, 12, 12)
         top_h_layout.setSpacing(0)
 
         self.center_widget = QWidget()
@@ -786,10 +791,9 @@ class SportsUploaderUI(QWidget):
         self.scroll_content = QWidget()
         self.scroll_content.setObjectName("scrollContent")
         scroll_layout = QVBoxLayout(self.scroll_content)
-        # Add margins to make content look better in the larger window
-        scroll_layout.setContentsMargins(20, 20, 20, 20)
-        # Reduce spacing to fit more content
-        scroll_layout.setSpacing(15)
+        # 外层已有边距，这里保持紧凑避免双重留白
+        scroll_layout.setContentsMargins(8, 8, 8, 8)
+        scroll_layout.setSpacing(12)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_content)
         self.scroll_area.viewport().setAutoFillBackground(False)
@@ -798,20 +802,20 @@ class SportsUploaderUI(QWidget):
 
         content_layout = QHBoxLayout()
         content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(16)
+        content_layout.setSpacing(14)
 
         left_column = QVBoxLayout()
         left_column.setContentsMargins(0, 0, 0, 0)
-        left_column.setSpacing(15)
+        left_column.setSpacing(12)
 
         right_column = QVBoxLayout()
         right_column.setContentsMargins(0, 0, 0, 0)
-        right_column.setSpacing(15)
+        right_column.setSpacing(12)
 
         header = QFrame()
         header.setObjectName("appHeader")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(16, 14, 16, 14)
+        header_layout.setContentsMargins(14, 10, 14, 10)
         header_layout.setSpacing(12)
 
         title_block = QVBoxLayout()
@@ -848,7 +852,7 @@ class SportsUploaderUI(QWidget):
         user_group = QGroupBox("用户配置")
         user_row_layout = QHBoxLayout()
         user_row_layout.setSpacing(14)
-        user_row_layout.setContentsMargins(15, 15, 15, 15)
+        user_row_layout.setContentsMargins(12, 12, 12, 12)
 
         username_layout = QVBoxLayout()
         username_layout.setSpacing(6)
@@ -880,8 +884,8 @@ class SportsUploaderUI(QWidget):
 
         status_group = QGroupBox("程序状态")
         status_layout = QVBoxLayout()
-        status_layout.setContentsMargins(15, 15, 15, 15)
-        status_layout.setSpacing(12)
+        status_layout.setContentsMargins(12, 12, 12, 12)
+        status_layout.setSpacing(10)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
@@ -900,7 +904,7 @@ class SportsUploaderUI(QWidget):
 
         self.log_output_area = QTextEdit()
         self.log_output_area.setReadOnly(True)
-        self.log_output_area.setFont(QFont("Monospace", 9))
+        self.log_output_area.setFont(QFont("Monospace", 10))
         self.log_output_area.setMinimumHeight(260)
         self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.log_output_area.setVisible(False)
@@ -912,8 +916,8 @@ class SportsUploaderUI(QWidget):
         # 添加运行次数和时间选择组件
         run_settings_group = QGroupBox("上传设置")
         run_settings_layout = QVBoxLayout()
-        run_settings_layout.setContentsMargins(15, 15, 15, 15)
-        run_settings_layout.setSpacing(14)
+        run_settings_layout.setContentsMargins(12, 12, 12, 12)
+        run_settings_layout.setSpacing(12)
 
         # 跑步次数
         days_layout = QVBoxLayout()
@@ -1066,8 +1070,8 @@ class SportsUploaderUI(QWidget):
 
         route_preview_group = QGroupBox("路线预览")
         route_preview_layout = QVBoxLayout()
-        route_preview_layout.setContentsMargins(15, 15, 15, 15)
-        route_preview_layout.setSpacing(10)
+        route_preview_layout.setContentsMargins(12, 12, 12, 12)
+        route_preview_layout.setSpacing(8)
 
         self.route_preview_summary_label = QLabel("上传前点击“预览路线”，即可在浏览器地图中查看按当前设置补点生成的路线。")
         self.route_preview_summary_label.setObjectName("sectionHint")
@@ -1123,9 +1127,9 @@ class SportsUploaderUI(QWidget):
         """
         根据给定的窗口宽度，计算并设置 center_widget 的固定宽度。
         """
-        # 横向布局需要更宽的内容区，同时保留少量边距。
-        available_width = max(0, window_width - 40)
-        calculated_width = int(min(available_width * 0.98, 1280))
+        # 内容区尽量占满窗口宽度，只留外层窄边距，减少两侧空白。
+        available_width = max(0, window_width - 24)
+        calculated_width = int(min(available_width, 1320))
         calculated_width = max(940, calculated_width)
         self.center_widget.setFixedWidth(calculated_width)
 
