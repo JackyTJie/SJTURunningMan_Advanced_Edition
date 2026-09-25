@@ -159,6 +159,7 @@ def generate_route_preview_html(preview):
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="referrer" content="no-referrer">
     <title>实际上传路线预览</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>

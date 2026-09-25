@@ -151,6 +151,7 @@ def generate_route_planner_html():
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="referrer" content="no-referrer">
     <title>路线规划器</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
