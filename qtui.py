@@ -7,7 +7,7 @@ import tempfile
 import webbrowser
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
+    QPushButton, QTextEdit, QProgressBar, QGroupBox, QDateTimeEdit,
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
     QSpacerItem, QFileDialog, QDialog, QFrame, QGraphicsDropShadowEffect
 )
@@ -480,11 +480,6 @@ class SportsUploaderUI(QWidget):
                 border: 1px solid rgba(220, 227, 217, 142);
                 background-color: rgba(225, 231, 225, 178);
             }
-            QFormLayout QLabel {
-                padding-top: 8px;
-                padding-bottom: 8px;
-                color: rgb(224, 242, 236);
-            }
             #startButton {
                 background-color: rgba(11, 116, 104, 226);
                 color: white;
@@ -851,19 +846,36 @@ class SportsUploaderUI(QWidget):
         left_column.addWidget(header)
 
         user_group = QGroupBox("用户配置")
-        user_form_layout = QFormLayout()
-        user_form_layout.setVerticalSpacing(15)
-        user_form_layout.setContentsMargins(15, 15, 15, 15)
+        user_row_layout = QHBoxLayout()
+        user_row_layout.setSpacing(14)
+        user_row_layout.setContentsMargins(15, 15, 15, 15)
+
+        username_layout = QVBoxLayout()
+        username_layout.setSpacing(6)
+        username_label_layout = QHBoxLayout()
+        username_label_layout.addWidget(QLabel("用户名:"))
+        username_label_layout.addStretch()
+        username_layout.addLayout(username_label_layout)
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Jaccount用户名")
+        username_layout.addWidget(self.username_input)
+
+        password_layout = QVBoxLayout()
+        password_layout.setSpacing(6)
+        password_label_layout = QHBoxLayout()
+        password_label_layout.addWidget(QLabel("密码:"))
+        password_label_layout.addStretch()
+        password_layout.addLayout(password_label_layout)
+
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("密码")
         self.password_input.setEchoMode(QLineEdit.Password)
+        password_layout.addWidget(self.password_input)
 
-        user_form_layout.addRow("用户名:", self.username_input)
-        user_form_layout.addRow("密码:", self.password_input)
-        user_group.setLayout(user_form_layout)
+        user_row_layout.addLayout(username_layout, 1)
+        user_row_layout.addLayout(password_layout, 1)
+        user_group.setLayout(user_row_layout)
         left_column.addWidget(user_group)
 
         status_group = QGroupBox("程序状态")
