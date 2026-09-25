@@ -22,7 +22,7 @@
 
 Windows 版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。程序默认会以昨日作为结束日期，向前生成指定次数的跑步记录（默认为1次），每次跑步4km，时间为08:00:00。
 
-> p.s. 电脑版软件的地图自定义路线功能已迁移至 Leaflet + OpenStreetMap，不再依赖百度地图 AK，不存在 API Key 被封禁的问题。导出的路线坐标仍为百度 BD09 经纬度，与旧路线文件及上传坐标校正完全兼容。注意：手机版（Android）目前仍使用百度地图 API，未随本次迁移改动。
+> p.s. 电脑版软件的地图自定义路线功能已增加 Leaflet + OpenStreetMap，默认百度地图。导出的路线坐标仍为百度 BD09 经纬度，与旧路线文件及上传坐标校正完全兼容。注意：手机版（Android）目前仍使用百度地图 API，未随本次迁移改动。
 
 <img src="assets/Sample.png" alt="Windows main UI preview" style="zoom: 33%;" />
 
@@ -46,23 +46,10 @@ Windows 版提供跑步次数、时间、距离和路线等参数配置，便于
 - **删除已导入路线** - “预设路线”下拉旁的“删除”按钮可移除 `Routes/` 中已导入的路线文件；内置 default 与旧版 user.txt 受保护
 - **距离上限提升至 5km** - 校验与提示文案同步更新，默认仍为 4km
 - **界面层级重调** - 背景暗化为渐变遮罩、字体整体加大、留白收紧、用户名/密码同行、左右两列底边对齐
-- **截图瘦身** - `Sample.png` 降至 1400px 宽并量化为 256 色，1.3MB 降到约 242KB
-
-> 注：v4.4.0 版本号仅对应电脑版/Windows 图形界面；手机版应用版本号保持不变。
-
-## 电脑版 v4.3.2 更新内容
-
-- **Windows UI 继续整理** - 上传设置改为紧凑双列表单，减少滚动；顶部增加 GitHub 仓库和水源讨论帖入口
-- **启动承诺书** - 打开软件时需阅读并勾选承诺书，确认不会用于违规操作后才可进入主界面
-- **路线预览** - “路线预览”区域和“预览路线”按钮：上传前按当前设置离线生成补点路线并在浏览器 OpenStreetMap 中预览；上传中/后展示真实 payload 坐标
-- **内置路线收敛** - 内置路线暂仅保留 `default.txt`；待校验路线已移入 `assets/Routes/NeedsReview/`
-- **路线选择升级** - “预设路线”下拉菜单支持 `default.txt`、旧版 `user.txt` 和外部 txt 路线导入
-- **自定义路线持久化** - 通过“自定义...”导入的 txt 会复制到 exe 同目录 `Routes/` 文件夹，重启后仍可选择；同名文件自动追加序号
-- **路线规划器提示更新** - “设计/更新路线”生成 `custom_route.txt`，下载后通过“预设路线 -> 自定义...”导入，不再要求放到项目根目录
 - **参数校验保留** - 跑步次数限制为1-30条，时间格式为HH:MM:SS，日期格式为YYYY-MM-DD，距离最多5km
 - **既有能力保留** - 手动登录、异地登录二次验证、跑步时间随机化和路线规划功能保持可用
 
-> 注：本次 v4.3.2 版本号仅对应电脑版/Windows 图形界面；手机版应用版本号保持不变。
+> 注：v4.4.0 版本号仅对应电脑版/Windows 图形界面；手机版应用版本号保持不变。
 
 ## 功能特性
 
@@ -168,7 +155,7 @@ Windows 版提供跑步次数、时间、距离和路线等参数配置，便于
 **多天上传支持:**
 
 - 支持一次性上传多天的跑步数据
-- 数据生成为过去N天（从昨天开始的连续N天）
+- 数据生成为**过去**N天（从昨天开始的连续N天）
 - 每天对应一个独立的上传请求
 
 **上传控制:**
@@ -354,10 +341,10 @@ python -m PyInstaller --clean --noconfirm .\main.spec
 
 - **原项目作者**: [@Labyrinth0419](https://github.com/Labyrinth0419) - 创建了优秀的原项目，后续加入交我办登陆功能
 - **原增强版作者**: [@accelerator-s](https://github.com/accelerator-s) - 添加了新功能和改进以及对异地的修复
-- **热心同学A**：[@CEQ151](https://github.com/CEQ151) - 优化电脑版图形界面和Readme
-- **热心同学B**：[@AetherWish](https://github.com/AetherWish) - 贡献了鸿蒙版源码
-- **热心同学C**：[@tangyang0](https://github.com/tangyang0) - 修复了在Mac上的Bug
-- **热心同学D**：[@dajiaohuang](https://github.com/dajiaohuang) - 修复变量未定义Bug
+- **热心同学**：[@CEQ151](https://github.com/CEQ151) - 优化电脑版图形界面和Readme
+- **热心同学**：[@AetherWish](https://github.com/AetherWish) - 贡献了鸿蒙版源码
+- **热心同学**：[@tangyang0](https://github.com/tangyang0) - 修复了在Mac上文件路径Bug
+- **热心校友**：[@dajiaohuang](https://github.com/dajiaohuang) - 修复变量未定义Bug
 
 ## 免责声明
 
@@ -365,4 +352,4 @@ python -m PyInstaller --clean --noconfirm .\main.spec
 
 ---
 
-**Last Update: Friday, Sep 25, 2026**
+**Last Update: Friday, Sep 25, 2026 “秋是”游园会**
