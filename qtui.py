@@ -15,9 +15,10 @@ from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, 
 from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap
 
 from src.main import run_sports_upload
-from src.route_preview import generate_route_preview_html
+from src.data_generator import generate_running_data_payload
+from src.route_preview import build_route_preview, generate_route_preview_html
 import src.login as login
-from utils.auxiliary_util import SportsUploaderError, get_base_path
+from utils.auxiliary_util import SportsUploaderError, get_base_path, get_current_epoch_ms
 import src.config as config
 
 
@@ -201,6 +202,26 @@ class WorkerThread(QThread):
 
     def route_preview_callback(self, preview):
         self.route_preview_ready.emit(preview)
+
+
+class RoutePreviewThread(QThread):
+    """离线生成路线预览的后台线程：无需登录，仅本地补点计算。"""
+    preview_ready = Signal(object)
+    preview_failed = Signal(str)
+
+    PREVIEW_STATUS = "预览（未上传）"
+
+    def __init__(self, config_data):
+        super().__init__()
+        self.config_data = config_data
+
+    def run(self):
+        try:
+            payload, _, _ = generate_running_data_payload(self.config_data, [], {})
+            preview = build_route_preview(payload, status=self.PREVIEW_STATUS)
+            self.preview_ready.emit(preview)
+        except Exception as e:
+            self.preview_failed.emit(str(e))
 
 
 class SportsUploaderUI(QWidget):
@@ -1036,15 +1057,14 @@ class SportsUploaderUI(QWidget):
         route_preview_layout.setContentsMargins(15, 15, 15, 15)
         route_preview_layout.setSpacing(10)
 
-        self.route_preview_summary_label = QLabel("生成后显示实际上传路线。")
+        self.route_preview_summary_label = QLabel("上传前点击“预览路线”，即可在浏览器地图中查看按当前设置补点生成的路线。")
         self.route_preview_summary_label.setObjectName("sectionHint")
         self.route_preview_summary_label.setWordWrap(True)
         route_preview_layout.addWidget(self.route_preview_summary_label)
 
-        self.route_preview_button = GlowButton("查看本次路线", glow_color=QColor(255, 226, 105, 180))
+        self.route_preview_button = GlowButton("预览路线", glow_color=QColor(255, 226, 105, 180))
         self.route_preview_button.setObjectName("routePreviewButton")
-        self.route_preview_button.setEnabled(False)
-        self.route_preview_button.setToolTip("查看当前生成并用于上传的实际轨迹。")
+        self.route_preview_button.setToolTip("按当前设置离线生成补点路线并在浏览器地图中预览；上传过程中/结束后显示实际上传轨迹。")
         self.route_preview_button.clicked.connect(self.show_route_preview)
         route_preview_layout.addWidget(self.route_preview_button)
 
@@ -1106,8 +1126,8 @@ class SportsUploaderUI(QWidget):
         except Exception:
             return
 
-    def get_settings_from_ui(self):
-        """从UI获取当前配置并返回字典"""
+    def get_settings_from_ui(self, require_credentials=True):
+        """从UI获取当前配置并返回字典；require_credentials=False 用于离线预览，跳过登录校验。"""
         try:
             username = self.username_input.text().strip()
             password = self.password_input.text()
@@ -1183,8 +1203,11 @@ class SportsUploaderUI(QWidget):
 
             # START_TIME_EPOCH_MS 由后端生成，不从 UI 获取
 
-            if not current_config["USER_ID"] or not current_config["PASSWORD"]:
-                raise ValueError("用户名和密码不能为空。")
+            if require_credentials:
+                if not current_config["USER_ID"] or not current_config["PASSWORD"]:
+                    raise ValueError("用户名和密码不能为空。")
+            elif not current_config["USER_ID"]:
+                current_config["USER_ID"] = "preview"
 
             return current_config
 
@@ -1516,15 +1539,56 @@ class SportsUploaderUI(QWidget):
         summary = preview.get("summary", "暂无可预览路线") if isinstance(preview, dict) else "暂无可预览路线"
         if hasattr(self, "route_preview_summary_label"):
             self.route_preview_summary_label.setText(summary)
-        if hasattr(self, "route_preview_button"):
-            self.route_preview_button.setEnabled(bool(isinstance(preview, dict) and preview.get("available")))
 
     def show_route_preview(self):
         preview = getattr(self, "_latest_route_preview", None)
-        if not preview or not preview.get("available"):
-            QMessageBox.information(self, "路线预览", "暂无可预览路线。请先生成跑步数据。")
+        if (
+            isinstance(preview, dict)
+            and preview.get("available")
+            and preview.get("status") != RoutePreviewThread.PREVIEW_STATUS
+        ):
+            # 来自上传流程的实际轨迹，直接打开
+            self.open_route_preview(preview)
+            return
+        # 上传前：按当前设置离线生成一遍补点路线再预览
+        self.generate_route_preview_offline()
+
+    def generate_route_preview_offline(self):
+        if getattr(self, "_preview_thread", None) and self._preview_thread.isRunning():
             return
 
+        try:
+            preview_config = self.get_settings_from_ui(require_credentials=False)
+        except Exception as e:
+            self.log_output_text(f"预览配置错误: {e}", "error")
+            QMessageBox.warning(self, "路线预览", f"配置错误: {e}")
+            return
+
+        preview_config["START_TIME_EPOCH_MS"] = get_current_epoch_ms()
+        self.route_preview_button.setEnabled(False)
+        self.route_preview_summary_label.setText("正在生成预览路线...")
+
+        self._preview_thread = RoutePreviewThread(preview_config)
+        self._preview_thread.preview_ready.connect(self.handle_offline_preview_ready)
+        self._preview_thread.preview_failed.connect(self.handle_offline_preview_failed)
+        self._preview_thread.start()
+
+    def handle_offline_preview_ready(self, preview):
+        self.route_preview_button.setEnabled(True)
+        if isinstance(preview, dict) and preview.get("available"):
+            self.route_preview_summary_label.setText(preview.get("summary", ""))
+            self.open_route_preview(preview)
+        else:
+            self.route_preview_summary_label.setText("未能生成可预览路线。")
+            QMessageBox.information(self, "路线预览", "未能生成可预览路线，请检查路线文件与设置。")
+
+    def handle_offline_preview_failed(self, message):
+        self.route_preview_button.setEnabled(True)
+        self.route_preview_summary_label.setText("预览生成失败。")
+        self.log_output_text(f"生成路线预览失败: {message}", "error")
+        QMessageBox.warning(self, "路线预览", f"生成失败: {message}")
+
+    def open_route_preview(self, preview):
         try:
             html_content = generate_route_preview_html(preview)
             temp_path = self.write_route_preview_html(html_content)
