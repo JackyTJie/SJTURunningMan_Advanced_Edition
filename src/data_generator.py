@@ -142,7 +142,289 @@ _COORD_TRANSFORM_JS = """
 """
 
 
-def generate_route_planner_html():
+BAIDU_MAP_AK = "MYUXpppuOOvq99cP2AmDvplAW76VV8vr"
+
+
+def generate_route_planner_html(provider="baidu", baidu_ak=BAIDU_MAP_AK):
+    """生成路线采集页面；provider 为 baidu（默认）或 osm。"""
+    if provider == "baidu":
+        return generate_baidu_map_html(ak=baidu_ak)
+    return generate_osm_map_html()
+
+
+def generate_baidu_map_html(ak="MYUXpppuOOvq99cP2AmDvplAW76VV8vr"):
+    """
+    生成百度地图HTML页面用于坐标采集
+    """
+    html_content = f'''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>路线规划器</title>
+    <style>
+        body, html, #map-container {{
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }}
+        #info {{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 350px;
+            max-height: 80vh;
+            overflow-y: auto;
+            font-size: 14px;
+        }}
+        #coordinate-list {{
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            background: #f9f9f9;
+        }}
+        .coord-item {{
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }}
+        .coord-item:hover {{
+            background-color: #f5f5f5;
+        }}
+        .coord-item:last-child {{
+            border-bottom: none;
+        }}
+        .warning {{
+            color: #d63031;
+            font-size: 12px;
+            margin: 5px 0;
+            padding: 5px;
+            background: #ffeaa7;
+            border-radius: 3px;
+        }}
+        .success {{
+            color: #00b894;
+            font-size: 12px;
+            margin: 5px 0;
+            padding: 5px;
+            background: #55efc4;
+            border-radius: 3px;
+        }}
+        button {{
+            background: #0984e3;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+            font-size: 12px;
+        }}
+        button:hover {{
+            background: #0767b3;
+        }}
+        button.clear {{
+            background: #d63031;
+        }}
+        button.clear:hover {{
+            background: #b02525;
+        }}
+        button.save {{
+            background: #00b894;
+        }}
+        button.save:hover {{
+            background: #009a7a;
+        }}
+        .control-group {{
+            margin: 10px 0;
+        }}
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🗺️ 路线规划器</h3>
+        <p>点击地图任意位置采集坐标点，形成跑步路线。下载 txt 后，回到软件的“预设路线”下拉菜单选择“自定义...”导入。</p>
+
+        <div class="control-group">
+            <button onclick="clearAllMarkers()" class="clear">清空所有点</button>
+            <button onclick="exportCoordinates()" class="save">下载路线 txt</button>
+        </div>
+
+        <div class="success" id="status">地图加载中...</div>
+
+        <div id="coordinate-list">
+            <div style="text-align: center; color: #666; padding: 20px;">
+                点击地图开始采集坐标...
+            </div>
+        </div>
+    </div>
+    <div id="map-container"></div>
+
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak={ak}"></script>
+    <script>
+        // 初始化地图
+        var map = new BMap.Map("map-container");
+        var statusDiv = document.getElementById('status');
+        var coordinateList = document.getElementById('coordinate-list');
+
+        // 设置中心点（上海交通大学闵行校区附近）
+        var point = new BMap.Point(121.442938, 31.031599);
+        map.centerAndZoom(point, 15);
+
+        // 启用滚轮缩放
+        map.enableScrollWheelZoom(true);
+
+        // 存储坐标的数组
+        var coordinates = [];
+        var markers = [];
+
+        // 地图加载成功回调
+        map.addEventListener("tilesloaded", function() {{
+            statusDiv.innerHTML = "✓ 地图加载成功，点击地图开始采集坐标";
+            statusDiv.className = "success";
+        }});
+
+        // 添加地图点击事件
+        map.addEventListener("click", function(e) {{
+            var lng = e.point.lng;
+            var lat = e.point.lat;
+
+            // 保存坐标
+            var coord = {{
+                lng: lng,
+                lat: lat,
+                timestamp: Date.now()
+            }};
+            coordinates.push(coord);
+
+            // 在点击位置添加标记
+            var marker = new BMap.Marker(e.point);
+            map.addOverlay(marker);
+            markers.push(marker);
+
+            // 添加标记点击事件（删除标记）
+            marker.addEventListener("click", function() {{
+                map.removeOverlay(marker);
+                // 从坐标数组中移除
+                var index = coordinates.findIndex(c =>
+                    Math.abs(c.lng - lng) < 0.000001 && Math.abs(c.lat - lat) < 0.000001);
+                if (index > -1) {{
+                    coordinates.splice(index, 1);
+                }}
+                // 从标记数组中移除
+                var markerIndex = markers.indexOf(marker);
+                if (markerIndex > -1) {{
+                    markers.splice(markerIndex, 1);
+                }}
+                updateCoordinateList();
+            }});
+
+            // 显示坐标信息
+            var infoWindow = new BMap.InfoWindow(
+                "经度: " + lng.toFixed(6) + "<br/>纬度: " + lat.toFixed(6) +
+                "<br/><small>点击标记可删除</small>"
+            );
+            marker.openInfoWindow(infoWindow);
+
+            // 更新坐标列表显示
+            updateCoordinateList();
+        }});
+
+        // 更新坐标列表显示
+        function updateCoordinateList() {{
+            coordinateList.innerHTML = '';
+
+            if (coordinates.length === 0) {{
+                coordinateList.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">点击地图开始采集坐标...</div>';
+                return;
+            }}
+
+            coordinates.forEach(function(coord, index) {{
+                var coordDiv = document.createElement('div');
+                coordDiv.className = 'coord-item';
+                coordDiv.innerHTML =
+                    '<strong>#' + (index + 1) + '</strong><br/>' +
+                    '经度: ' + coord.lng.toFixed(6) + '<br/>' +
+                    '纬度: ' + coord.lat.toFixed(6);
+                coordinateList.appendChild(coordDiv);
+            }});
+        }}
+
+        // 清空所有标记
+        function clearAllMarkers() {{
+            // 移除所有标记
+            markers.forEach(function(marker) {{
+                map.removeOverlay(marker);
+            }});
+            markers = [];
+            coordinates = [];
+            updateCoordinateList();
+            statusDiv.innerHTML = "所有坐标已清空";
+            statusDiv.className = "success";
+        }}
+
+        // 导出坐标为文件
+        function exportCoordinates() {{
+            if (coordinates.length < 2) {{
+                alert("请至少选择2个坐标点！");
+                return;
+            }}
+
+            let coordText = "";
+            coordinates.forEach(function(coord) {{
+                coordText += coord.lng + "," + coord.lat + "\\n";
+            }});
+
+            // Create download link
+            var blob = new Blob([coordText], {{ type: 'text/plain' }});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'custom_route.txt';
+            document.body.appendChild(a);
+            
+            // Show import instructions for the desktop UI.
+            statusDiv.innerHTML = '✓ 已下载 custom_route.txt。<br/>请回到软件，在“预设路线”中选择“自定义...”导入。 (' + coordinates.length + '个点)';
+            statusDiv.className = "success";
+            
+            // Programmatically click the link
+            a.click();
+            
+            // Clean up
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }}
+
+        // 添加缩放控件
+        map.addControl(new BMap.NavigationControl());
+        map.addControl(new BMap.ScaleControl());
+        map.addControl(new BMap.MapTypeControl());
+    </script>
+</body>
+</html>
+    '''
+    
+    # 保存HTML文件
+    html_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'route_planner.html')
+    with open(html_file_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    return html_file_path
+
+
+def generate_osm_map_html():
     """
     生成 Leaflet + OpenStreetMap 路线采集页面（无百度 AK 依赖）。
     页面点击采集 WGS84 坐标并实时转换为百度 BD09 导出，与旧路线文件及上传校正完全兼容。

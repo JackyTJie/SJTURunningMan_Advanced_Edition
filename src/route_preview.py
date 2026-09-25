@@ -141,7 +141,146 @@ def format_preview_summary(preview):
     return f"{prefix}{distance_km:.2f}km / {point_count}点 / {jump_count}处跳段 / {status}"
 
 
-def generate_route_preview_html(preview):
+BAIDU_MAP_AK = "MYUXpppuOOvq99cP2AmDvplAW76VV8vr"
+
+
+def generate_route_preview_html(preview, provider="baidu", baidu_ak=BAIDU_MAP_AK):
+    """生成路线预览页面；provider 为 baidu（默认）或 osm。"""
+    if provider == "baidu":
+        return _generate_baidu_preview_html(preview, baidu_ak=baidu_ak)
+    return _generate_osm_preview_html(preview)
+
+
+def _generate_baidu_preview_html(preview, baidu_ak=BAIDU_MAP_AK):
+    points = preview.get("points", []) if preview else []
+    jumps = preview.get("jump_segments", []) if preview else []
+    stats = preview.get("stats", {}) if preview else {}
+
+    safe_summary = html.escape(format_preview_summary(preview))
+    safe_status = html.escape(preview.get("status", "未知") if preview else "未知")
+    data_json = json.dumps(points, ensure_ascii=False)
+    jumps_json = json.dumps(jumps, ensure_ascii=False)
+
+    distance_km = (stats.get("distance_m") or 0.0) / 1000.0
+    duration_min = (stats.get("duration_sec") or 0.0) / 60.0
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>实际上传路线预览</title>
+    <style>
+        html, body, #map {{
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, "Microsoft YaHei", sans-serif;
+        }}
+        #panel {{
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(15, 23, 42, 0.14);
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+            padding: 12px 14px;
+            color: #172033;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+        #panel h1 {{
+            margin: 0 0 8px;
+            font-size: 15px;
+        }}
+        #panel .muted {{
+            color: #667085;
+        }}
+        #panel .warn {{
+            color: #b42318;
+            font-weight: 700;
+        }}
+        #empty {{
+            display: none;
+            position: absolute;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            color: #475467;
+            background: #f8fafc;
+            font-size: 16px;
+        }}
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="empty">暂无可预览路线</div>
+    <div id="panel">
+        <h1>实际上传路线</h1>
+        <div class="muted">{safe_summary}</div>
+        <div>状态：{safe_status}</div>
+        <div>距离：{distance_km:.2f} km</div>
+        <div>时长：{duration_min:.1f} min</div>
+        <div>点数：{stats.get("point_count", 0)} 个</div>
+        <div>起终点距离：{stats.get("start_end_m", 0.0):.1f} m</div>
+        <div class="warn">跳段：{stats.get("jump_count", 0)} 处，最长 {stats.get("max_segment_m", 0.0):.1f} m</div>
+        <div class="muted">地图显示已反向应用 GPS 校正，统计仍按上传坐标计算。</div>
+    </div>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak={html.escape(baidu_ak)}"></script>
+    <script>
+        var routePoints = {data_json};
+        var jumpSegments = {jumps_json};
+
+        if (!routePoints || routePoints.length < 2) {{
+            document.getElementById("empty").style.display = "flex";
+        }} else {{
+            var map = new BMap.Map("map");
+            var bPoints = routePoints.map(function(p) {{
+                return new BMap.Point(p.display_lng || p.lng, p.display_lat || p.lat);
+            }});
+            map.centerAndZoom(bPoints[0], 16);
+            map.enableScrollWheelZoom(true);
+            map.addControl(new BMap.NavigationControl());
+            map.addControl(new BMap.ScaleControl());
+            map.addControl(new BMap.MapTypeControl());
+
+            var routeLine = new BMap.Polyline(bPoints, {{
+                strokeColor: "#2563eb",
+                strokeWeight: 5,
+                strokeOpacity: 0.82
+            }});
+            map.addOverlay(routeLine);
+
+            jumpSegments.forEach(function(seg) {{
+                var jumpLine = new BMap.Polyline([
+                    new BMap.Point((seg.display_from || seg.from).lng, (seg.display_from || seg.from).lat),
+                    new BMap.Point((seg.display_to || seg.to).lng, (seg.display_to || seg.to).lat)
+                ], {{
+                    strokeColor: "#dc2626",
+                    strokeWeight: 6,
+                    strokeOpacity: 0.9
+                }});
+                map.addOverlay(jumpLine);
+            }});
+
+            var startMarker = new BMap.Marker(bPoints[0]);
+            var endMarker = new BMap.Marker(bPoints[bPoints.length - 1]);
+            map.addOverlay(startMarker);
+            map.addOverlay(endMarker);
+            startMarker.setTitle("起点");
+            endMarker.setTitle("终点");
+            map.setViewport(bPoints, {{ margins: [70, 360, 40, 40] }});
+        }}
+    </script>
+</body>
+</html>"""
+
+
+def _generate_osm_preview_html(preview):
     """生成 Leaflet + OpenStreetMap 路线预览页面（无百度 AK 依赖）。"""
     points = preview.get("points", []) if preview else []
     jumps = preview.get("jump_segments", []) if preview else []
