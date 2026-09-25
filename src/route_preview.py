@@ -10,7 +10,7 @@ UPLOAD_LONGITUDE_OFFSET = -0.00651271494735 + 0.000094
 UPLOAD_LATITUDE_OFFSET = -0.00560888976477 - 0.000700
 
 
-def build_route_preview(payload, run_index=None, total_runs=None, status="待上传", risk_analysis=None):
+def build_route_preview(payload, run_index=None, total_runs=None, status="待上传"):
     """Build a serializable preview object from the actual upload payload."""
     points = extract_payload_points(payload)
     if len(points) < 2:
@@ -30,7 +30,6 @@ def build_route_preview(payload, run_index=None, total_runs=None, status="待上
                 "jump_count": 0,
             },
             "jump_segments": [],
-            "risk": _risk_summary(risk_analysis),
             "summary": "暂无可预览路线",
         }
 
@@ -68,14 +67,12 @@ def build_route_preview(payload, run_index=None, total_runs=None, status="待上
         "max_segment_m": round(max_segment, 2),
         "jump_count": len(jump_segments),
     }
-    risk = _risk_summary(risk_analysis)
     summary = format_preview_summary({
         "available": True,
         "run_index": run_index,
         "total_runs": total_runs,
         "status": status,
         "stats": stats,
-        "risk": risk,
     })
 
     return {
@@ -86,7 +83,6 @@ def build_route_preview(payload, run_index=None, total_runs=None, status="待上
         "points": points,
         "stats": stats,
         "jump_segments": jump_segments,
-        "risk": risk,
         "summary": summary,
     }
 
@@ -142,11 +138,7 @@ def format_preview_summary(preview):
     point_count = stats.get("point_count") or 0
     jump_count = stats.get("jump_count") or 0
     status = preview.get("status") or "待上传"
-    risk = preview.get("risk") or {}
-    risk_part = ""
-    if risk.get("score") is not None:
-        risk_part = f" / {risk.get('level_label', '风险')} {risk['score']}"
-    return f"{prefix}{distance_km:.2f}km / {point_count}点 / {jump_count}处跳段{risk_part} / {status}"
+    return f"{prefix}{distance_km:.2f}km / {point_count}点 / {jump_count}处跳段 / {status}"
 
 
 def generate_route_preview_html(preview):
@@ -154,7 +146,6 @@ def generate_route_preview_html(preview):
     points = preview.get("points", []) if preview else []
     jumps = preview.get("jump_segments", []) if preview else []
     stats = preview.get("stats", {}) if preview else {}
-    risk = preview.get("risk", {}) if preview else {}
 
     safe_summary = html.escape(format_preview_summary(preview))
     safe_status = html.escape(preview.get("status", "未知") if preview else "未知")
@@ -163,11 +154,6 @@ def generate_route_preview_html(preview):
 
     distance_km = (stats.get("distance_m") or 0.0) / 1000.0
     duration_min = (stats.get("duration_sec") or 0.0) / 60.0
-    risk_text = ""
-    if risk.get("score") is not None:
-        risk_text = f"{risk.get('score')}/100（{risk.get('level_label', '未知')}）"
-    else:
-        risk_text = "未检测"
 
     template = """<!DOCTYPE html>
 <html>
@@ -234,7 +220,6 @@ def generate_route_preview_html(preview):
         <div>点数：__COUNT__ 个</div>
         <div>起终点距离：__STARTEND__ m</div>
         <div class="warn">跳段：__JUMPS__ 处，最长 __MAXSEG__ m</div>
-        <div>风险：__RISK__</div>
         <div class="muted">地图显示已反向应用 GPS 校正并转为 WGS84 渲染，统计仍按上传坐标计算。</div>
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -297,14 +282,13 @@ __TRANSFORM_JS__
         "__STARTEND__": f"{stats.get('start_end_m', 0.0):.1f}",
         "__JUMPS__": str(stats.get("jump_count", 0)),
         "__MAXSEG__": f"{stats.get('max_segment_m', 0.0):.1f}",
-        "__RISK__": html.escape(risk_text),
         "__TRANSFORM_JS__": _COORD_TRANSFORM_JS,
         "__DATA__": data_json,
         "__JUMPSDATA__": jumps_json,
     }
     page = template
     for token in ("__SUMMARY__", "__STATUS__", "__DISTANCE__", "__DURATION__", "__COUNT__",
-                  "__STARTEND__", "__MAXSEG__", "__RISK__", "__TRANSFORM_JS__", "__DATA__",
+                  "__STARTEND__", "__MAXSEG__", "__TRANSFORM_JS__", "__DATA__",
                   "__JUMPSDATA__", "__JUMPS__"):
         page = page.replace(token, replacements[token])
     return page
@@ -314,13 +298,3 @@ def _track_count(payload):
     if not isinstance(payload, list):
         return 0
     return sum(len(run.get("tracks", []) or []) for run in payload if isinstance(run, dict))
-
-
-def _risk_summary(risk_analysis):
-    if not risk_analysis:
-        return {}
-    return {
-        "score": risk_analysis.get("score"),
-        "level": risk_analysis.get("level"),
-        "level_label": risk_analysis.get("level_label"),
-    }

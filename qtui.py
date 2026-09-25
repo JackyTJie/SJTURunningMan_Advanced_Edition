@@ -145,14 +145,12 @@ class WorkerThread(QThread):
     log_output = Signal(str, str)
     finished = Signal(bool, str)
     route_too_long = Signal(str, str)  # Signal to emit when route is too long
-    trajectory_risk_confirmation = Signal(object)
     route_preview_ready = Signal(object)
 
     def __init__(self, config_data):
         super().__init__()
         self.config_data = config_data
         self._continue_after_route_check = True  # Default to continue execution
-        self._risk_decision = True
 
     def run(self):
         success = False
@@ -163,7 +161,6 @@ class WorkerThread(QThread):
                 progress_callback=self.progress_callback,
                 log_cb=self.log_callback,
                 stop_check_cb=self.isInterruptionRequested,
-                risk_confirm_cb=self.risk_confirm_callback,
                 route_preview_cb=self.route_preview_callback
             )
         except SportsUploaderError as e:
@@ -201,18 +198,6 @@ class WorkerThread(QThread):
                     self.msleep(100)
                 return  # Don't emit the log message when it was a special route message
         self.log_output.emit(message, level)
-
-    def risk_confirm_callback(self, analysis):
-        if self.isInterruptionRequested():
-            return False
-
-        self._risk_decision = None
-        self.trajectory_risk_confirmation.emit(analysis)
-
-        while self._risk_decision is None and not self.isInterruptionRequested():
-            self.msleep(100)
-
-        return bool(self._risk_decision) and not self.isInterruptionRequested()
 
     def route_preview_callback(self, preview):
         self.route_preview_ready.emit(preview)
@@ -1485,7 +1470,6 @@ class SportsUploaderUI(QWidget):
         self._thread.progress_update.connect(self.update_progress)
         self._thread.log_output.connect(self.log_output_text)
         self._thread.route_too_long.connect(self.handle_route_too_long)
-        self._thread.trajectory_risk_confirmation.connect(self.handle_trajectory_risk_confirmation)
         self._thread.route_preview_ready.connect(self.handle_route_preview_ready)
         self._thread.finished.connect(self.upload_finished)
         self._thread.start()
@@ -1526,40 +1510,6 @@ class SportsUploaderUI(QWidget):
                 self.log_output_text("用户选择停止任务", "info")
                 self.stop_button.setEnabled(False)
                 self.status_label.setText("状态: 正在停止...")
-
-    def handle_trajectory_risk_confirmation(self, analysis):
-        """Ask the user whether to continue uploading a high-risk trajectory."""
-        score = analysis.get("score", 0)
-        level_label = analysis.get("level_label", "高风险")
-        stats = analysis.get("stats", {})
-        findings = analysis.get("findings", [])[:3]
-        reason_text = "\n".join(
-            f"- {item.get('name', '风险项')} +{item.get('score', 0)}: {item.get('detail', '')}"
-            for item in findings
-        ) or "- 未提供具体风险原因"
-
-        point_count = stats.get("point_count", 0)
-        distance_km = (stats.get("distance_m", 0) or 0) / 1000
-        duration_sec = stats.get("duration_sec", 0) or 0
-
-        reply = QMessageBox.question(
-            self,
-            "高风险轨迹确认",
-            f"风险指数: {score}/100（{level_label}）\n"
-            f"轨迹概况: {point_count} 个点，{distance_km:.2f}km，{duration_sec:.0f}s\n\n"
-            f"主要原因:\n{reason_text}\n\n"
-            f"是否继续上传这条轨迹？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-
-        if self._thread:
-            if reply == QMessageBox.StandardButton.Yes:
-                self._thread._risk_decision = True
-                self.log_output_text("用户选择继续上传高风险轨迹", "warning")
-            else:
-                self._thread._risk_decision = False
-                self.log_output_text("用户取消上传高风险轨迹", "warning")
 
     def handle_route_preview_ready(self, preview):
         self._latest_route_preview = preview
