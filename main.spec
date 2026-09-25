@@ -29,14 +29,14 @@ a = Analysis(
         'src.login',
         'src.config',
         'src.route_preview',
-        'src.trajectory_risk_analyzer',
         'utils.auxiliary_util',
         'assets.resources_rc',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PIL', 'numpy', 'matplotlib', 'tkinter', 'scipy', 'pandas'],
+    excludes=['PIL', 'numpy', 'matplotlib', 'tkinter', 'scipy', 'pandas',
+              'cryptography', 'cffi', 'pycparser'],
     noarchive=False,
 )
 
