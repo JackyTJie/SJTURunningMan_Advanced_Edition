@@ -1,18 +1,19 @@
 import sys
 import os
 import re
+import math
 import ctypes
 import shutil
 import tempfile
 import webbrowser
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QProgressBar, QFormLayout, QGroupBox, QDateTimeEdit,
+    QPushButton, QTextEdit, QProgressBar, QGroupBox, QDateTimeEdit,
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
     QSpacerItem, QFileDialog, QDialog, QFrame, QGraphicsDropShadowEffect
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap
+from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve, QPointF
+from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap, QLinearGradient, QPen, QPolygonF
 
 from src.main import run_sports_upload
 from src.data_generator import generate_running_data_payload
@@ -224,6 +225,56 @@ class RoutePreviewThread(QThread):
             self.preview_failed.emit(str(e))
 
 
+class RouteShapeWidget(QWidget):
+    """按坐标绘制所选路线的轮廓折线：无地图瓦片，等比自动缩放。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._coords = []
+        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setToolTip("所选路线的坐标轮廓（等比缩放，非地图）")
+
+    def set_coordinates(self, coords):
+        self._coords = list(coords or [])
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if len(self._coords) < 2:
+            painter.setPen(QColor(140, 160, 170))
+            painter.drawText(self.rect(), Qt.AlignCenter, "暂无路线坐标")
+            return
+
+        rect = self.rect().adjusted(12, 12, -12, -12)
+        lons = [lon for lon, _ in self._coords]
+        lats = [lat for _, lat in self._coords]
+        mid_lat = (min(lats) + max(lats)) / 2.0
+        # 经度按纬度余弦折算，保证形状不被横向拉伸
+        kx = max(0.2, math.cos(math.radians(mid_lat)))
+        span_x = (max(lons) - min(lons)) * kx or 1e-9
+        span_y = (max(lats) - min(lats)) or 1e-9
+        scale = min(rect.width() / span_x, rect.height() / span_y)
+        center_lon = (min(lons) + max(lons)) / 2.0
+        center_lat = (min(lats) + max(lats)) / 2.0
+
+        points = []
+        for lon, lat in self._coords:
+            x = rect.center().x() + (lon - center_lon) * kx * scale
+            y = rect.center().y() - (lat - center_lat) * scale
+            points.append(QPointF(x, y))
+
+        painter.setPen(QPen(QColor(75, 255, 218, 220), 2))
+        painter.drawPolyline(QPolygonF(points))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(22, 163, 74))
+        painter.drawEllipse(points[0], 4, 4)
+        painter.setBrush(QColor(220, 38, 38))
+        painter.drawEllipse(points[-1], 4, 4)
+
+
 class SportsUploaderUI(QWidget):
     def __init__(self):
         super().__init__()
@@ -292,24 +343,24 @@ class SportsUploaderUI(QWidget):
 
             #appTitle {
                 color: rgb(255, 255, 252);
-                font-size: 17pt;
+                font-size: 20pt;
                 font-weight: 800;
                 background-color: transparent;
             }
 
             #sectionHint {
                 color: rgba(229, 246, 240, 210);
-                font-size: 8pt;
+                font-size: 9pt;
                 background-color: transparent;
             }
 
             #floatingHint {
                 color: rgba(255, 255, 252, 224);
-                font-size: 8pt;
+                font-size: 9pt;
                 background-color: rgba(8, 14, 24, 118);
                 border: 1px solid rgba(72, 255, 215, 82);
                 border-radius: 7px;
-                padding: 7px 9px;
+                padding: 6px 8px;
             }
 
             #warningBox {
@@ -317,20 +368,20 @@ class SportsUploaderUI(QWidget):
                 color: rgb(255, 241, 205);
                 border: 1px solid rgba(255, 204, 95, 154);
                 border-radius: 8px;
-                padding: 18px;
-                font-size: 10pt;
+                padding: 14px;
+                font-size: 11pt;
                 font-weight: 600;
                 line-height: 145%;
             }
-            
+
             /* GroupBox 样式 */
             QGroupBox {
-                font-size: 10pt;
+                font-size: 12pt;
                 font-weight: bold;
                 margin-top: 0;
                 border: 1px solid rgba(78, 255, 216, 72);
                 border-radius: 8px;
-                padding: 32px 15px 15px 15px;
+                padding: 36px 12px 12px 12px;
                 color: rgb(225, 255, 248);
                 background-color: rgba(6, 14, 22, 166);
             }
@@ -338,8 +389,8 @@ class SportsUploaderUI(QWidget):
                 subcontrol-origin: padding;
                 subcontrol-position: top left;
                 left: 12px;
-                top: 7px;
-                padding: 3px 12px;
+                top: 8px;
+                padding: 4px 12px;
                 color: rgb(232, 255, 248);
                 background-color: rgba(11, 28, 34, 210);
                 border: 1px solid rgba(88, 255, 220, 124);
@@ -350,17 +401,17 @@ class SportsUploaderUI(QWidget):
             QLabel {
                 color: rgb(235, 247, 243);
                 background-color: transparent;
-                font-size: 9pt;
+                font-size: 11pt;
             }
-            
+
             QLineEdit, QComboBox, QDateTimeEdit {
                 background-color: rgba(6, 18, 27, 188);
                 border: 1px solid rgba(94, 255, 223, 104);
                 border-radius: 6px;
-                padding: 8px;
+                padding: 9px;
                 color: rgb(239, 255, 250);
-                font-size: 9pt;
-                min-height: 20px;
+                font-size: 11pt;
+                min-height: 22px;
                 selection-background-color: rgb(75, 255, 218);
                 selection-color: rgb(4, 20, 23);
                 placeholder-text-color: rgba(226, 244, 238, 154);
@@ -397,7 +448,7 @@ class SportsUploaderUI(QWidget):
                 padding: 6px;
             }
             QComboBox QAbstractItemView::item {
-                min-height: 28px;
+                min-height: 32px;
                 padding: 6px 8px;
             }
             QComboBox QAbstractItemView::item:hover {
@@ -413,9 +464,10 @@ class SportsUploaderUI(QWidget):
                 color: rgb(240, 255, 250);
                 border: 1px solid rgba(91, 255, 222, 78);
                 border-radius: 6px;
-                padding: 8px 16px;
-                min-height: 24px;
-                max-height: 36px;
+                padding: 10px 18px;
+                min-height: 26px;
+                max-height: 44px;
+                font-size: 11pt;
                 font-weight: 600;
             }
             QPushButton:hover {
@@ -438,7 +490,8 @@ class SportsUploaderUI(QWidget):
                 text-align: center;
                 background-color: rgba(5, 15, 23, 186);
                 color: rgb(226, 255, 248);
-                max-height: 20px;
+                max-height: 24px;
+                font-size: 10pt;
                 font-weight: 700;
             }
             QProgressBar::chunk {
@@ -480,15 +533,12 @@ class SportsUploaderUI(QWidget):
                 border: 1px solid rgba(220, 227, 217, 142);
                 background-color: rgba(225, 231, 225, 178);
             }
-            QFormLayout QLabel {
-                padding-top: 8px;
-                padding-bottom: 8px;
-                color: rgb(224, 242, 236);
-            }
             #startButton {
                 background-color: rgba(11, 116, 104, 226);
                 color: white;
                 border: 1px solid rgba(69, 255, 214, 174);
+                font-size: 13pt;
+                font-weight: 700;
             }
             #startButton:hover {
                 background-color: rgba(15, 158, 136, 236);
@@ -501,6 +551,7 @@ class SportsUploaderUI(QWidget):
                 background-color: rgba(159, 42, 67, 225);
                 color: white;
                 border: 1px solid rgba(255, 82, 153, 174);
+                font-size: 12pt;
             }
             #stopButton:hover {
                 background-color: rgba(196, 49, 92, 236);
@@ -711,6 +762,7 @@ class SportsUploaderUI(QWidget):
         self.route_combo.setCurrentIndex(max(0, target_index))
         self._last_route_index = self.route_combo.currentIndex()
         self._route_combo_updating = False
+        self.refresh_route_shape()
 
     def restore_previous_route_selection(self):
         if not hasattr(self, "route_combo"):
@@ -773,10 +825,63 @@ class SportsUploaderUI(QWidget):
             return
 
         self._last_route_index = index
+        self.refresh_route_shape()
+
+    def refresh_route_shape(self):
+        """按当前所选路线文件刷新右侧轮廓小图。"""
+        if not hasattr(self, "route_shape_widget"):
+            return
+
+        coords = []
+        route_path = self.route_combo.currentData()
+        if isinstance(route_path, str) and route_path and os.path.exists(route_path):
+            try:
+                from src.data_generator import read_gps_coordinates_from_file
+                coords = read_gps_coordinates_from_file(route_path)
+            except Exception:
+                coords = []
+        self.route_shape_widget.set_coordinates(coords)
+        self.update_delete_route_button()
+
+    def _selected_route_is_imported(self):
+        route_path = self.route_combo.currentData()
+        if not isinstance(route_path, str) or not route_path:
+            return False
+        routes_dir = os.path.abspath(self.get_user_routes_dir())
+        return os.path.dirname(os.path.abspath(route_path)) == routes_dir
+
+    def update_delete_route_button(self):
+        if hasattr(self, "delete_route_button"):
+            self.delete_route_button.setEnabled(self._selected_route_is_imported())
+
+    def delete_selected_route(self):
+        """删除选中的已导入路线文件并回退到默认路线。"""
+        if not self._selected_route_is_imported():
+            return
+
+        route_path = self.route_combo.currentData()
+        reply = QMessageBox.question(
+            self,
+            "删除路线",
+            f"确定删除已导入路线文件？\n{os.path.basename(route_path)}\n\n文件删除后不可恢复（可重新导入），选择将回退到默认路线。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            os.remove(route_path)
+            self.log_output_text(f"已删除导入路线: {os.path.basename(route_path)}", "info")
+        except OSError as e:
+            QMessageBox.warning(self, "删除路线失败", str(e))
+            return
+
+        self.populate_route_combo()
 
     def init_ui(self):
         top_h_layout = QHBoxLayout()
-        top_h_layout.setContentsMargins(20, 20, 20, 20)
+        top_h_layout.setContentsMargins(12, 12, 12, 12)
         top_h_layout.setSpacing(0)
 
         self.center_widget = QWidget()
@@ -791,10 +896,9 @@ class SportsUploaderUI(QWidget):
         self.scroll_content = QWidget()
         self.scroll_content.setObjectName("scrollContent")
         scroll_layout = QVBoxLayout(self.scroll_content)
-        # Add margins to make content look better in the larger window
-        scroll_layout.setContentsMargins(20, 20, 20, 20)
-        # Reduce spacing to fit more content
-        scroll_layout.setSpacing(15)
+        # 外层已有边距，这里保持紧凑避免双重留白
+        scroll_layout.setContentsMargins(8, 8, 8, 8)
+        scroll_layout.setSpacing(12)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setWidget(self.scroll_content)
         self.scroll_area.viewport().setAutoFillBackground(False)
@@ -803,20 +907,20 @@ class SportsUploaderUI(QWidget):
 
         content_layout = QHBoxLayout()
         content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(16)
+        content_layout.setSpacing(14)
 
         left_column = QVBoxLayout()
         left_column.setContentsMargins(0, 0, 0, 0)
-        left_column.setSpacing(15)
+        left_column.setSpacing(12)
 
         right_column = QVBoxLayout()
         right_column.setContentsMargins(0, 0, 0, 0)
-        right_column.setSpacing(15)
+        right_column.setSpacing(12)
 
         header = QFrame()
         header.setObjectName("appHeader")
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(16, 14, 16, 14)
+        header_layout.setContentsMargins(14, 10, 14, 10)
         header_layout.setSpacing(12)
 
         title_block = QVBoxLayout()
@@ -851,25 +955,42 @@ class SportsUploaderUI(QWidget):
         left_column.addWidget(header)
 
         user_group = QGroupBox("用户配置")
-        user_form_layout = QFormLayout()
-        user_form_layout.setVerticalSpacing(15)
-        user_form_layout.setContentsMargins(15, 15, 15, 15)
+        user_row_layout = QHBoxLayout()
+        user_row_layout.setSpacing(14)
+        user_row_layout.setContentsMargins(12, 12, 12, 12)
+
+        username_layout = QVBoxLayout()
+        username_layout.setSpacing(6)
+        username_label_layout = QHBoxLayout()
+        username_label_layout.addWidget(QLabel("用户名:"))
+        username_label_layout.addStretch()
+        username_layout.addLayout(username_label_layout)
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Jaccount用户名")
+        username_layout.addWidget(self.username_input)
+
+        password_layout = QVBoxLayout()
+        password_layout.setSpacing(6)
+        password_label_layout = QHBoxLayout()
+        password_label_layout.addWidget(QLabel("密码:"))
+        password_label_layout.addStretch()
+        password_layout.addLayout(password_label_layout)
+
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("密码")
         self.password_input.setEchoMode(QLineEdit.Password)
+        password_layout.addWidget(self.password_input)
 
-        user_form_layout.addRow("用户名:", self.username_input)
-        user_form_layout.addRow("密码:", self.password_input)
-        user_group.setLayout(user_form_layout)
+        user_row_layout.addLayout(username_layout, 1)
+        user_row_layout.addLayout(password_layout, 1)
+        user_group.setLayout(user_row_layout)
         left_column.addWidget(user_group)
 
         status_group = QGroupBox("程序状态")
         status_layout = QVBoxLayout()
-        status_layout.setContentsMargins(15, 15, 15, 15)
-        status_layout.setSpacing(12)
+        status_layout.setContentsMargins(12, 12, 12, 12)
+        status_layout.setSpacing(10)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
@@ -888,7 +1009,7 @@ class SportsUploaderUI(QWidget):
 
         self.log_output_area = QTextEdit()
         self.log_output_area.setReadOnly(True)
-        self.log_output_area.setFont(QFont("Monospace", 9))
+        self.log_output_area.setFont(QFont("Monospace", 10))
         self.log_output_area.setMinimumHeight(260)
         self.log_output_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.log_output_area.setVisible(False)
@@ -900,8 +1021,8 @@ class SportsUploaderUI(QWidget):
         # 添加运行次数和时间选择组件
         run_settings_group = QGroupBox("上传设置")
         run_settings_layout = QVBoxLayout()
-        run_settings_layout.setContentsMargins(15, 15, 15, 15)
-        run_settings_layout.setSpacing(14)
+        run_settings_layout.setContentsMargins(12, 12, 12, 12)
+        run_settings_layout.setSpacing(12)
 
         # 跑步次数
         days_layout = QVBoxLayout()
@@ -1007,8 +1128,20 @@ class SportsUploaderUI(QWidget):
         self.route_combo.setToolTip("选择本次生成记录使用的路线。")
         self.populate_route_combo()
         self.route_combo.currentIndexChanged.connect(self.on_route_combo_changed)
-        route_layout.addWidget(self.route_combo)
-        route_layout.addWidget(self.create_hint_label("内置路线暂仅保留 default；其他路线待校验后恢复，也可选择“自定义...”导入 txt。"))
+
+        self.delete_route_button = GlowButton("删除", glow_color=QColor(255, 82, 153, 190))
+        self.delete_route_button.setObjectName("deleteRouteButton")
+        self.delete_route_button.setFixedWidth(64)
+        self.delete_route_button.setToolTip("删除当前选中的已导入路线文件；内置 default 和旧版 user.txt 不可删除。")
+        self.delete_route_button.setEnabled(False)
+        self.delete_route_button.clicked.connect(self.delete_selected_route)
+
+        route_input_layout = QHBoxLayout()
+        route_input_layout.setSpacing(8)
+        route_input_layout.addWidget(self.route_combo, 1)
+        route_input_layout.addWidget(self.delete_route_button)
+        route_layout.addLayout(route_input_layout)
+        route_layout.addWidget(self.create_hint_label("内置路线暂仅保留 default；其他路线待校验后恢复，也可选择“自定义...”导入 txt，导入后可用“删除”移除。"))
 
         run_settings_layout.addLayout(route_layout)
 
@@ -1053,24 +1186,33 @@ class SportsUploaderUI(QWidget):
         right_column.addWidget(route_generator_hint)
 
         route_preview_group = QGroupBox("路线预览")
-        route_preview_layout = QVBoxLayout()
-        route_preview_layout.setContentsMargins(15, 15, 15, 15)
-        route_preview_layout.setSpacing(10)
+        route_preview_layout = QHBoxLayout()
+        route_preview_layout.setContentsMargins(12, 12, 12, 12)
+        route_preview_layout.setSpacing(12)
+
+        preview_left_layout = QVBoxLayout()
+        preview_left_layout.setSpacing(8)
 
         self.route_preview_summary_label = QLabel("上传前点击“预览路线”，即可在浏览器地图中查看按当前设置补点生成的路线。")
         self.route_preview_summary_label.setObjectName("sectionHint")
         self.route_preview_summary_label.setWordWrap(True)
-        route_preview_layout.addWidget(self.route_preview_summary_label)
+        preview_left_layout.addWidget(self.route_preview_summary_label)
 
         self.route_preview_button = GlowButton("预览路线", glow_color=QColor(255, 226, 105, 180))
         self.route_preview_button.setObjectName("routePreviewButton")
         self.route_preview_button.setToolTip("按当前设置离线生成补点路线并在浏览器地图中预览；上传过程中/结束后显示实际上传轨迹。")
         self.route_preview_button.clicked.connect(self.show_route_preview)
-        route_preview_layout.addWidget(self.route_preview_button)
+        preview_left_layout.addWidget(self.route_preview_button)
+        preview_left_layout.addStretch(1)
+
+        self.route_shape_widget = RouteShapeWidget()
+        route_preview_layout.addLayout(preview_left_layout, 2)
+        route_preview_layout.addWidget(self.route_shape_widget, 3)
 
         route_preview_group.setLayout(route_preview_layout)
-        right_column.addWidget(route_preview_group)
-        right_column.addStretch(1)
+        # 与左列“程序状态”同用 stretch 1，两列底边对齐
+        right_column.addWidget(route_preview_group, 1)
+        self.refresh_route_shape()
 
         content_layout.addLayout(left_column, 5)
         content_layout.addLayout(right_column, 4)
@@ -1088,10 +1230,15 @@ class SportsUploaderUI(QWidget):
             x = (self.width() - scaled.width()) // 2
             y = (self.height() - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
+
+            # 渐变暗化遮罩：背景只作氛围，第一眼看到的应是前景 UI
+            overlay = QLinearGradient(0, 0, 0, max(1, self.height()))
+            overlay.setColorAt(0.0, QColor(3, 12, 20, 209))   # rgba(3, 12, 20, 0.82)
+            overlay.setColorAt(1.0, QColor(3, 12, 20, 224))   # rgba(3, 12, 20, 0.88)
+            painter.fillRect(self.rect(), overlay)
         else:
             painter.fillRect(self.rect(), QColor(7, 16, 19))
 
-        painter.fillRect(self.rect(), QColor(5, 12, 15, 142))
         super().paintEvent(event)
 
     def resizeEvent(self, event):
@@ -1106,9 +1253,9 @@ class SportsUploaderUI(QWidget):
         """
         根据给定的窗口宽度，计算并设置 center_widget 的固定宽度。
         """
-        # 横向布局需要更宽的内容区，同时保留少量边距。
-        available_width = max(0, window_width - 40)
-        calculated_width = int(min(available_width * 0.98, 1280))
+        # 内容区尽量占满窗口宽度，只留外层窄边距，减少两侧空白。
+        available_width = max(0, window_width - 24)
+        calculated_width = int(min(available_width, 1320))
         calculated_width = max(940, calculated_width)
         self.center_widget.setFixedWidth(calculated_width)
 
