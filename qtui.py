@@ -1203,6 +1203,16 @@ class SportsUploaderUI(QWidget):
         self.route_preview_button.setToolTip("按当前设置离线生成补点路线并在浏览器地图中预览；上传过程中/结束后显示实际上传轨迹。")
         self.route_preview_button.clicked.connect(self.show_route_preview)
         preview_left_layout.addWidget(self.route_preview_button)
+
+        map_provider_row = QHBoxLayout()
+        map_provider_row.setSpacing(8)
+        map_provider_row.addWidget(QLabel("地图引擎:"))
+        self.map_provider_combo = NoWheelComboBox()
+        self.map_provider_combo.addItem("百度地图（默认）", "baidu")
+        self.map_provider_combo.addItem("OpenStreetMap", "osm")
+        self.map_provider_combo.setToolTip("路线规划器和路线预览使用的地图引擎；百度为默认。")
+        map_provider_row.addWidget(self.map_provider_combo, 1)
+        preview_left_layout.addLayout(map_provider_row)
         preview_left_layout.addStretch(1)
 
         self.route_shape_widget = RouteShapeWidget()
@@ -1737,7 +1747,8 @@ class SportsUploaderUI(QWidget):
 
     def open_route_preview(self, preview):
         try:
-            html_content = generate_route_preview_html(preview)
+            provider = self.map_provider_combo.currentData() if hasattr(self, "map_provider_combo") else "baidu"
+            html_content = generate_route_preview_html(preview, provider=provider)
             temp_path = self.write_route_preview_html(html_content)
             webbrowser.open(QUrl.fromLocalFile(temp_path).toString())
             self.log_output_text("已在系统浏览器中打开路线预览。", "info")
@@ -1899,10 +1910,13 @@ class SportsUploaderUI(QWidget):
             import os
             import webbrowser
 
+            provider = self.map_provider_combo.currentData() if hasattr(self, "map_provider_combo") else "baidu"
+            provider_label = "百度地图" if provider == "baidu" else "OpenStreetMap"
+
             # Inform user about the route planning process
-            reply = QMessageBox.question(self, "路线规划", 
+            reply = QMessageBox.question(self, "路线规划",
                                     "此功能将启动路线规划器，您可以：\n\n"
-                                    "1. 在浏览器中打开在线地图（OpenStreetMap）\n"
+                                    f"1. 在浏览器中打开在线地图（{provider_label}）\n"
                                     "2. 点击地图采集坐标点形成路线\n"
                                     "3. 点击\"下载路线 txt\"保存路线文件\n"
                                     "4. 回到软件，在\"预设路线\"中选择\"自定义...\"导入该 txt\n\n"
@@ -1912,9 +1926,8 @@ class SportsUploaderUI(QWidget):
                                     QMessageBox.StandardButton.Yes)
 
             if reply == QMessageBox.StandardButton.Yes:
-                # Generate the route planner HTML (Leaflet + OpenStreetMap, no API key)
                 try:
-                    map_path = generate_route_planner_html()
+                    map_path = generate_route_planner_html(provider=provider)
                     webbrowser.open(f'file://{os.path.abspath(map_path)}')
                     
                     QMessageBox.information(self, "路线规划器", 
