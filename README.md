@@ -7,7 +7,7 @@
   <p>
     <img alt="Python" src="https://img.shields.io/badge/Python-3.x-3776AB?logo=python&amp;logoColor=white" />
     <img alt="PySide6" src="https://img.shields.io/badge/PySide6-Qt%20for%20Python-41CD52?logo=qt&amp;logoColor=white" />
-    <img alt="Windows GUI" src="https://img.shields.io/badge/Windows%20GUI-v4.3.2-0078D4?logo=windows&amp;logoColor=white" />
+    <img alt="Windows GUI" src="https://img.shields.io/badge/Windows%20GUI-v4.4.0-0078D4?logo=windows&amp;logoColor=white" />
     <img alt="Android" src="https://img.shields.io/badge/Android-v4.2.0-3DDC84?logo=android&amp;logoColor=white" />
     <img alt="Route Import" src="https://img.shields.io/badge/Routes-Default%20%2B%20Import-2A6F97" />
     <img alt="Route Preview" src="https://img.shields.io/badge/Route%20Preview-OpenStreetMap-D97706" />
@@ -22,7 +22,7 @@
 
 Windows 版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。程序默认会以昨日作为结束日期，向前生成指定次数的跑步记录（默认为1次），每次跑步4km，时间为08:00:00。
 
-> p.s. 软件的地图自定义路线功能已迁移至 Leaflet + OpenStreetMap，不再依赖百度地图 AK，不存在 API Key 被封禁的问题。导出的路线坐标仍为百度 BD09 经纬度，与旧路线文件及上传坐标校正完全兼容。
+> p.s. 电脑版软件的地图自定义路线功能已迁移至 Leaflet + OpenStreetMap，不再依赖百度地图 AK，不存在 API Key 被封禁的问题。导出的路线坐标仍为百度 BD09 经纬度，与旧路线文件及上传坐标校正完全兼容。注意：手机版（Android）目前仍使用百度地图 API，未随本次迁移改动。
 
 <img src="assets/Sample.png" alt="Windows main UI preview" style="zoom: 33%;" />
 
@@ -30,13 +30,25 @@ Windows 版提供跑步次数、时间、距离和路线等参数配置，便于
 
 | 模块 | 当前状态 |
 | --- | --- |
-| Windows 图形界面 | PySide6 轻量桌面版，当前版本 `v4.3.2` |
+| Windows 图形界面 | PySide6 轻量桌面版，当前版本 `v4.4.0` |
 | 界面主题 | Windows 主界面和说明弹窗已切换为背景图 + 玻璃拟态主题 |
 | 路线选择 | 内置路线暂仅保留 `default.txt`；旧版 `user.txt`、外部 txt 导入和持久化仍可用 |
 | 路线预览 | 上传前即可离线生成补点路线并在浏览器地图中预览；上传中/后显示实际 payload 的距离、点数和跳段 |
 | 输入方式 | 跑步次数、时间、结束日期、距离均为文本输入并带格式校验 |
 | 安全提示 | 启动前需阅读并勾选承诺书；主界面保留醒目使用警告 |
 | 移动端 | Android 版本号保持 `4.2.0` |
+
+## 电脑版 v4.4.0 更新内容
+
+- **移除客户端轨迹风险指数自检** - 上传前不再做风险打分和高风险弹窗；上传流程收敛为获取认证、生成并上传两步
+- **路线预览上传前可用** - “预览路线”按钮按当前设置离线补点生成并在浏览器 OpenStreetMap 地图中预览，无需登录；上传中/后显示实际上传轨迹
+- **路线预览框分栏** - 左侧摘要与按钮，右侧按所选路线坐标绘制等比轮廓小图（无地图瓦片，自动缩放）
+- **删除已导入路线** - “预设路线”下拉旁的“删除”按钮可移除 `Routes/` 中已导入的路线文件；内置 default 与旧版 user.txt 受保护
+- **距离上限提升至 5km** - 校验与提示文案同步更新，默认仍为 4km
+- **界面层级重调** - 背景暗化为渐变遮罩、字体整体加大、留白收紧、用户名/密码同行、左右两列底边对齐
+- **截图瘦身** - `Sample.png` 降至 1400px 宽并量化为 256 色，1.3MB 降到约 242KB
+
+> 注：v4.4.0 版本号仅对应电脑版/Windows 图形界面；手机版应用版本号保持不变。
 
 ## 电脑版 v4.3.2 更新内容
 

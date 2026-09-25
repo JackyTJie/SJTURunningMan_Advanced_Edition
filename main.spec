@@ -6,7 +6,7 @@ from pathlib import Path
 project_root = Path(SPECPATH).resolve()
 assets_dir = project_root / 'assets'
 is_mac = sys.platform == 'darwin'
-app_version = '4.3.3'
+app_version = '4.4.0'
 icon_path = assets_dir / ('SJTURM.icns' if is_mac else 'SJTURM.ico')
 
 a = Analysis(
