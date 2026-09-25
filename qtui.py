@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import math
 import ctypes
 import shutil
 import tempfile
@@ -11,8 +12,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
     QSpacerItem, QFileDialog, QDialog, QFrame, QGraphicsDropShadowEffect
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap, QLinearGradient
+from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve, QPointF
+from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap, QLinearGradient, QPen, QPolygonF
 
 from src.main import run_sports_upload
 from src.data_generator import generate_running_data_payload
@@ -222,6 +223,56 @@ class RoutePreviewThread(QThread):
             self.preview_ready.emit(preview)
         except Exception as e:
             self.preview_failed.emit(str(e))
+
+
+class RouteShapeWidget(QWidget):
+    """按坐标绘制所选路线的轮廓折线：无地图瓦片，等比自动缩放。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._coords = []
+        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setToolTip("所选路线的坐标轮廓（等比缩放，非地图）")
+
+    def set_coordinates(self, coords):
+        self._coords = list(coords or [])
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if len(self._coords) < 2:
+            painter.setPen(QColor(140, 160, 170))
+            painter.drawText(self.rect(), Qt.AlignCenter, "暂无路线坐标")
+            return
+
+        rect = self.rect().adjusted(12, 12, -12, -12)
+        lons = [lon for lon, _ in self._coords]
+        lats = [lat for _, lat in self._coords]
+        mid_lat = (min(lats) + max(lats)) / 2.0
+        # 经度按纬度余弦折算，保证形状不被横向拉伸
+        kx = max(0.2, math.cos(math.radians(mid_lat)))
+        span_x = (max(lons) - min(lons)) * kx or 1e-9
+        span_y = (max(lats) - min(lats)) or 1e-9
+        scale = min(rect.width() / span_x, rect.height() / span_y)
+        center_lon = (min(lons) + max(lons)) / 2.0
+        center_lat = (min(lats) + max(lats)) / 2.0
+
+        points = []
+        for lon, lat in self._coords:
+            x = rect.center().x() + (lon - center_lon) * kx * scale
+            y = rect.center().y() - (lat - center_lat) * scale
+            points.append(QPointF(x, y))
+
+        painter.setPen(QPen(QColor(75, 255, 218, 220), 2))
+        painter.drawPolyline(QPolygonF(points))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(22, 163, 74))
+        painter.drawEllipse(points[0], 4, 4)
+        painter.setBrush(QColor(220, 38, 38))
+        painter.drawEllipse(points[-1], 4, 4)
 
 
 class SportsUploaderUI(QWidget):
@@ -711,6 +762,7 @@ class SportsUploaderUI(QWidget):
         self.route_combo.setCurrentIndex(max(0, target_index))
         self._last_route_index = self.route_combo.currentIndex()
         self._route_combo_updating = False
+        self.refresh_route_shape()
 
     def restore_previous_route_selection(self):
         if not hasattr(self, "route_combo"):
@@ -773,6 +825,22 @@ class SportsUploaderUI(QWidget):
             return
 
         self._last_route_index = index
+        self.refresh_route_shape()
+
+    def refresh_route_shape(self):
+        """按当前所选路线文件刷新右侧轮廓小图。"""
+        if not hasattr(self, "route_shape_widget"):
+            return
+
+        coords = []
+        route_path = self.route_combo.currentData()
+        if isinstance(route_path, str) and route_path and os.path.exists(route_path):
+            try:
+                from src.data_generator import read_gps_coordinates_from_file
+                coords = read_gps_coordinates_from_file(route_path)
+            except Exception:
+                coords = []
+        self.route_shape_widget.set_coordinates(coords)
 
     def init_ui(self):
         top_h_layout = QHBoxLayout()
@@ -1069,24 +1137,33 @@ class SportsUploaderUI(QWidget):
         right_column.addWidget(route_generator_hint)
 
         route_preview_group = QGroupBox("路线预览")
-        route_preview_layout = QVBoxLayout()
+        route_preview_layout = QHBoxLayout()
         route_preview_layout.setContentsMargins(12, 12, 12, 12)
-        route_preview_layout.setSpacing(8)
+        route_preview_layout.setSpacing(12)
+
+        preview_left_layout = QVBoxLayout()
+        preview_left_layout.setSpacing(8)
 
         self.route_preview_summary_label = QLabel("上传前点击“预览路线”，即可在浏览器地图中查看按当前设置补点生成的路线。")
         self.route_preview_summary_label.setObjectName("sectionHint")
         self.route_preview_summary_label.setWordWrap(True)
-        route_preview_layout.addWidget(self.route_preview_summary_label)
+        preview_left_layout.addWidget(self.route_preview_summary_label)
 
         self.route_preview_button = GlowButton("预览路线", glow_color=QColor(255, 226, 105, 180))
         self.route_preview_button.setObjectName("routePreviewButton")
         self.route_preview_button.setToolTip("按当前设置离线生成补点路线并在浏览器地图中预览；上传过程中/结束后显示实际上传轨迹。")
         self.route_preview_button.clicked.connect(self.show_route_preview)
-        route_preview_layout.addWidget(self.route_preview_button)
+        preview_left_layout.addWidget(self.route_preview_button)
+        preview_left_layout.addStretch(1)
+
+        self.route_shape_widget = RouteShapeWidget()
+        route_preview_layout.addLayout(preview_left_layout, 2)
+        route_preview_layout.addWidget(self.route_shape_widget, 3)
 
         route_preview_group.setLayout(route_preview_layout)
-        right_column.addWidget(route_preview_group)
-        right_column.addStretch(1)
+        # 与左列“程序状态”同用 stretch 1，两列底边对齐
+        right_column.addWidget(route_preview_group, 1)
+        self.refresh_route_shape()
 
         content_layout.addLayout(left_column, 5)
         content_layout.addLayout(right_column, 4)
