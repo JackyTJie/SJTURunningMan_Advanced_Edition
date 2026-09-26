@@ -1,0 +1,173 @@
+name: Release
+
+# 推 v* tag 触发；也可手动指定已有 tag 重跑。
+# 产物：Windows exe / macOS universal2 dmg / Linux deb，汇合成 draft release，人工点发布。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要构建的已有 tag（如 v4.5.0）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: '3.14.6'
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      tag: ${{ steps.ver.outputs.tag }}
+    steps:
+      - id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"   # workflow_dispatch 时 GITHUB_REF_NAME 是分支名，需覆盖
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    needs: meta
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Write version into config
+        shell: pwsh
+        run: Set-Content -Path src/config.py -Value ('global_version = "v{0}"' -f '${{ needs.meta.outputs.version }}')
+      - name: Install deps
+        run: |
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build exe
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ needs.meta.outputs.version }}
+        run: python -m PyInstaller --clean --noconfirm main.spec
+      - name: Rename artifact
+        shell: pwsh
+        run: Copy-Item dist/SJTURunningMan.exe ("SJTURunningMan_{0}_windows.exe" -f '${{ needs.meta.outputs.version }}')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win
+          path: SJTURunningMan_*_windows.exe
+
+  build-macos:
+    needs: meta
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.tag }}
+      # 关键：python.org 官方 pkg 是 universal2，PySide6 wheel 也是 universal2，
+      # 这样 PyInstaller --target-architecture universal2 才能出真双架构包。
+      # setup-python 在 mac runner 上不保证 universal2，故直接装官方 pkg。
+      - name: Install universal2 Python
+        run: |
+          curl -fsSL -o python.pkg "https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
+          sudo installer -pkg python.pkg -target /
+          echo "/Library/Frameworks/Python.framework/Versions/${PYTHON_VERSION%.*}/bin" >> "$GITHUB_PATH"
+      - name: Check python arch
+        run: lipo -archs /Library/Frameworks/Python.framework/Versions/${PYTHON_VERSION%.*}/Python
+      - name: Write version into config
+        run: printf 'global_version = "v%s"\n' '${{ needs.meta.outputs.version }}' > src/config.py
+      - name: Install deps
+        run: |
+          python3 -m pip install -r requirements.txt pyinstaller
+      - name: Build app + dmg
+        env:
+          APP_VERSION: ${{ needs.meta.outputs.version }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          python3 -m PyInstaller --clean --noconfirm main.spec
+          ARCHS=$(lipo -archs dist/SJTURunningMan.app/Contents/MacOS/SJTURunningMan)
+          echo "app archs: $ARCHS"
+          echo "$ARCHS" | grep -q x86_64 && echo "$ARCHS" | grep -q arm64 || { echo "not universal2"; exit 1; }
+          hdiutil create -volname "SJTURunningMan ${VERSION}" \
+            -srcfolder dist/SJTURunningMan.app -ov -format UDZO \
+            "SJTURunningMan_${VERSION}_macOS.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: SJTURunningMan_*_macOS.dmg
+
+  build-linux:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Write version into config
+        run: printf 'global_version = "v%s"\n' '${{ needs.meta.outputs.version }}' > src/config.py
+      - name: Install deps
+        run: |
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build binary
+        env:
+          APP_VERSION: ${{ needs.meta.outputs.version }}
+        run: python -m PyInstaller --clean --noconfirm main.spec
+      - name: Package deb
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
+          mkdir -p pkgroot/usr/bin pkgroot/usr/share/applications pkgroot/usr/share/pixmaps
+          cp dist/SJTURunningMan pkgroot/usr/bin/sjturunningman
+          cp assets/SJTURM.png pkgroot/usr/share/pixmaps/sjturunningman.png
+          cat > pkgroot/usr/share/applications/sjturunningman.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=SJTU 校园轻松跑
+          Exec=sjturunningman
+          Icon=sjturunningman
+          Terminal=false
+          Categories=Education;
+          EOF
+          fpm -s dir -t deb -n sjturunningman -v "$VERSION" \
+            --maintainer 'Jacky Tang <tang.jie@live.com>' \
+            --url 'https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition' \
+            --description 'SJTU 校园轻松跑' \
+            --depends libgl1 --depends libegl1 --depends libxkbcommon0 \
+            --depends libdbus-1-3 --depends libfontconfig1 \
+            -p "SJTURunningMan_${VERSION}_linux.deb" \
+            -C pkgroot .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: SJTURunningMan_*_linux.deb
+
+  release:
+    needs: [meta, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.meta.outputs.tag }}
+          name: ${{ needs.meta.outputs.version }}
+          draft: true                 # 人工确认后发布
+          generate_release_notes: true
+          files: artifacts/*

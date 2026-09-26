@@ -1,12 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 import sys
 from pathlib import Path
 
 project_root = Path(SPECPATH).resolve()
 assets_dir = project_root / 'assets'
 is_mac = sys.platform == 'darwin'
-app_version = '4.4.0'
+# CI 从 release tag 注入；本地缺省沿用 4.4.0
+app_version = os.environ.get('APP_VERSION', '4.4.0')
 icon_path = assets_dir / ('SJTURM.icns' if is_mac else 'SJTURM.ico')
 
 a = Analysis(
