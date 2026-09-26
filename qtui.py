@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QScrollArea, QSizePolicy, QCheckBox, QComboBox,
     QSpacerItem, QFileDialog, QDialog, QFrame, QGraphicsDropShadowEffect
 )
-from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve, QPointF
+from PySide6.QtCore import QThread, Signal, QDateTime, Qt, QUrl, QEvent, QSize, QPropertyAnimation, QEasingCurve, QPointF, QTimer
 from PySide6.QtGui import QTextCursor, QFont, QColor, QTextCharFormat, QPalette, QBrush, QIcon, QDesktopServices, QPainter, QPixmap, QLinearGradient, QPen, QPolygonF
 
 from src.main import run_sports_upload
@@ -23,7 +23,7 @@ from utils.auxiliary_util import SportsUploaderError, get_base_path, get_current
 import src.config as config
 
 
-from src.info_dialog import HelpWidget
+from src.info_dialog import HelpWidget, UI_FONT_FAMILIES
 
 RESOURCES_SUB_DIR = "assets"
 ROUTES_SUB_DIR = os.path.join(RESOURCES_SUB_DIR, "Routes")
@@ -328,7 +328,7 @@ class SportsUploaderUI(QWidget):
             QWidget {
                 background-color: transparent;
                 color: rgb(238, 246, 242);
-                font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+                font-family: __UI_FONT__;
             }
 
             #mainWindow, #contentShell, #mainScrollArea, #scrollContent {
@@ -640,7 +640,7 @@ class SportsUploaderUI(QWidget):
                 border: 1px solid rgb(91, 122, 111);
                 padding: 6px;
             }
-        """)
+        """.replace("__UI_FONT__", UI_FONT_FAMILIES))
 
     def create_hint_label(self, text):
         label = QLabel(text)
@@ -1958,15 +1958,27 @@ class SportsUploaderUI(QWidget):
                 # 使用数值来避免某些静态类型检查器对 QEvent 枚举成员的误报
                 ev_type = event.type()
                 if ev_type in (19, 5):  # 19 = Close, 5 = Hide
-                    try:
-                        watched.removeEventFilter(self)
-                    except Exception:
-                        pass
-                    self._help_window = None
+                    # 严禁在事件派发过程中移除过滤器或释放窗口：
+                    # 那会在 Qt 还在遍历该窗口的过滤器链表/投递鼠标事件时改动它，
+                    # 导致 macOS 上关闭关于窗口后崩溃。延后到本轮事件处理结束再做。
+                    QTimer.singleShot(0, lambda w=watched: self.release_help_window(w))
         except Exception:
             pass
 
         return super().eventFilter(watched, event)
+
+    def release_help_window(self, watched):
+        """事件派发结束后再清理关于窗口的引用（由 eventFilter 延后调用）。"""
+        try:
+            if watched is not getattr(self, "_help_window", None):
+                return
+            try:
+                watched.removeEventFilter(self)
+            except Exception:
+                pass
+            self._help_window = None
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     set_windows_app_id()

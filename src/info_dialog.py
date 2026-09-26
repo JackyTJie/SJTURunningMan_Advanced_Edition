@@ -1,15 +1,17 @@
 import random
 import math
 import os
+import sys
 from utils.auxiliary_util import get_base_path
 
 import src.config as config
+from src.update_checker import UpdateCheckTask
 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
+    QSize, QThreadPool, QTime, QUrl, Qt)
 from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
-    QCursor, QFont, QFontDatabase, QGradient,
+    QCursor, QDesktopServices, QFont, QFontDatabase, QGradient,
     QIcon, QImage, QKeySequence, QLinearGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
@@ -20,6 +22,36 @@ from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QHeaderView,
     QStyledItemDelegate, QStyleOptionViewItem, QToolTip)
 import assets.resources_rc as resources_rc
 from PySide6.QtCore import QModelIndex, QEvent, QTimer, QPointF, QRectF, QSizeF, Qt
+
+# 存活中的检查更新任务，防止未结束时被垃圾回收
+_LIVE_UPDATE_TASKS = []
+
+
+def prune_update_tasks():
+    """清掉已跑完但没被回调清理的任务（例如检查途中窗口就被关了）。"""
+    try:
+        for task in list(_LIVE_UPDATE_TASKS):
+            if task.done:
+                _LIVE_UPDATE_TASKS.remove(task)
+    except Exception:
+        pass
+
+# 界面字体族：macOS 上没有微软雅黑，优先用系统中文字体，避免 Qt 反复做字体回退
+if sys.platform == "darwin":
+    UI_FONT_FAMILIES_LIST = ["PingFang SC", "Hiragino Sans GB", "Heiti SC",
+                             "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI"]
+else:
+    UI_FONT_FAMILIES_LIST = ["Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI",
+                             "PingFang SC"]
+
+UI_FONT_FAMILIES = ", ".join(f'"{name}"' for name in UI_FONT_FAMILIES_LIST) + ", sans-serif"
+
+# 状态文字配色：发现新版本 / 已是最新 / 出错
+UPDATE_STATUS_COLORS = {
+    "update": "#7cffb2",
+    "ok": "rgba(255, 255, 255, 0.72)",
+    "error": "#ff9c9c",
+}
 
 RESOURCES_SUB_DIR = "assets"
 
@@ -35,7 +67,7 @@ class Ui_HelpWindow(object):
         HelpWindow.setMinimumSize(QSize(520, 320))
         HelpWindow.setMaximumSize(QSize(520, 320))
         HelpWindow.setWindowIcon(QIcon(os.path.join(RESOURCES_FULL_PATH, "SJTURM.png")))
-        HelpWindow.setStyleSheet(u"#HelpWindow {\n"
+        HelpWindow.setStyleSheet((u"#HelpWindow {\n"
 "	border: none;\n"
 "}\n"
 "\n"
@@ -47,21 +79,27 @@ class Ui_HelpWindow(object):
 "\n"
 "#thankYouLabel {\n"
 "	color: #ffffff;\n"
-"	font: 700 21pt \"Microsoft YaHei UI\";\n"
+"	font-family: __UI_FONT__;\n"
+"	font-size: 22pt;\n"
+"	font-weight: 700;\n"
 "	background-color: transparent;\n"
 "	letter-spacing: 0px;\n"
 "}\n"
 "\n"
 "#infoLabel {\n"
 "	color: rgba(255, 255, 255, 0.90);\n"
-"	font: 500 10.5pt \"Microsoft YaHei UI\";\n"
+"	font-family: __UI_FONT__;\n"
+"	font-size: 12pt;\n"
+"	font-weight: 500;\n"
 "	background-color: transparent;\n"
 "	line-height: 150%;\n"
 "}\n"
 "\n"
 "#versionPill {\n"
 "	color: rgba(255, 255, 255, 0.92);\n"
-"	font: 700 9pt \"Microsoft YaHei UI\";\n"
+"	font-family: __UI_FONT__;\n"
+"	font-size: 10pt;\n"
+"	font-weight: 700;\n"
 "	background-color: rgba(255, 255, 255, 0.14);\n"
 "	border: 1px solid rgba(255, 255, 255, 0.26);\n"
 "	border-radius: 13px;\n"
@@ -74,7 +112,9 @@ class Ui_HelpWindow(object):
 "	border: 1px solid rgba(255, 255, 255, 0.34);\n"
 "	border-radius: 16px;\n"
 "	color: #ffffff;\n"
-"	font: 700 10.5pt \"Microsoft YaHei UI\";\n"
+"	font-family: __UI_FONT__;\n"
+"	font-size: 11pt;\n"
+"	font-weight: 700;\n"
 "	padding: 5px 18px;\n"
 "}\n"
 "\n"
@@ -86,7 +126,41 @@ class Ui_HelpWindow(object):
 "#okButton:pressed {\n"
 "	background-color: rgba(255, 255, 255, 0.16);\n"
 "	border: 1px solid rgba(255, 255, 255, 0.42);\n"
+"}\n"
+"\n"
+"#checkUpdateButton {\n"
+"	background-color: rgba(255, 255, 255, 0.08);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.26);\n"
+"	border-radius: 16px;\n"
+"	color: rgba(255, 255, 255, 0.92);\n"
+"	font-family: __UI_FONT__;\n"
+"	font-size: 11pt;\n"
+"	font-weight: 700;\n"
+"	padding: 5px 14px;\n"
+"}\n"
+"\n"
+"#checkUpdateButton:hover {\n"
+"	background-color: rgba(255, 255, 255, 0.18);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.46);\n"
+"}\n"
+"\n"
+"#checkUpdateButton:pressed {\n"
+"	background-color: rgba(255, 255, 255, 0.12);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.38);\n"
+"}\n"
+"\n"
+"#checkUpdateButton:disabled {\n"
+"	color: rgba(255, 255, 255, 0.52);\n"
+"	border: 1px solid rgba(255, 255, 255, 0.16);\n"
+"}\n"
+"\n"
+"#updateStatusLabel {\n"
+"	font-family: __UI_FONT__;\n"
+"	font-size: 10pt;\n"
+"	font-weight: 500;\n"
+"	background-color: transparent;\n"
 "}")
+.replace("__UI_FONT__", UI_FONT_FAMILIES))
         self.backgroundLabel = QLabel(HelpWindow)
         self.backgroundLabel.setObjectName(u"backgroundLabel")
         self.backgroundLabel.setGeometry(QRect(0, 0, 520, 320))
@@ -99,8 +173,8 @@ class Ui_HelpWindow(object):
         self.infoLabel.setObjectName(u"infoLabel")
         self.infoLabel.setGeometry(QRect(58, 101, 404, 120))
         font = QFont()
-        font.setFamilies([u"Microsoft YaHei UI"])
-        font.setPointSize(10)
+        font.setFamilies(UI_FONT_FAMILIES_LIST)
+        font.setPointSize(12)
         font.setBold(False)
         font.setItalic(False)
         self.infoLabel.setFont(font)
@@ -127,8 +201,8 @@ class Ui_HelpWindow(object):
         sizePolicy.setHeightForWidth(self.thankYouLabel.sizePolicy().hasHeightForWidth())
         self.thankYouLabel.setSizePolicy(sizePolicy)
         font1 = QFont()
-        font1.setFamilies([u"Microsoft YaHei UI"])
-        font1.setPointSize(21)
+        font1.setFamilies(UI_FONT_FAMILIES_LIST)
+        font1.setPointSize(22)
         font1.setBold(True)
         font1.setItalic(False)
         self.thankYouLabel.setFont(font1)
@@ -137,6 +211,20 @@ class Ui_HelpWindow(object):
         self.versionPill.setObjectName(u"versionPill")
         self.versionPill.setGeometry(QRect(360, 59, 102, 26))
         self.versionPill.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.updateStatusLabel = QLabel(HelpWindow)
+        self.updateStatusLabel.setObjectName(u"updateStatusLabel")
+        self.updateStatusLabel.setGeometry(QRect(56, 244, 176, 30))
+        font2 = QFont()
+        font2.setFamilies(UI_FONT_FAMILIES_LIST)
+        font2.setPointSize(10)
+        font2.setBold(False)
+        font2.setItalic(False)
+        self.updateStatusLabel.setFont(font2)
+        self.updateStatusLabel.setAlignment(Qt.AlignmentFlag.AlignLeading|Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
+        self.checkUpdateButton = QPushButton(HelpWindow)
+        self.checkUpdateButton.setObjectName(u"checkUpdateButton")
+        self.checkUpdateButton.setGeometry(QRect(240, 243, 112, 32))
+        self.checkUpdateButton.setCursor(QCursor(Qt.PointingHandCursor))
 
         self.retranslateUi(HelpWindow)
 
@@ -151,6 +239,8 @@ class Ui_HelpWindow(object):
         self.okButton.setText(QCoreApplication.translate("HelpWindow", u"知道了", None))
         self.thankYouLabel.setText(QCoreApplication.translate("HelpWindow", u"感谢您的使用", None))
         self.versionPill.setText(QCoreApplication.translate("HelpWindow", config.global_version, None))
+        self.updateStatusLabel.setText("")
+        self.checkUpdateButton.setText(QCoreApplication.translate("HelpWindow", u"检查更新", None))
     # retranslateUi
 
 # --- 创建一个专门用于绘制彩带的透明遮罩层类 ---
@@ -223,6 +313,14 @@ class HelpWidget(QWidget):
                 self.ui.okButton.clicked.connect(self.close)
             except Exception:
                 pass
+        # 检查更新相关状态
+        self.update_task = None
+        self.update_url = ""
+        try:
+            self.ui.checkUpdateButton.clicked.connect(self.on_check_update_clicked)
+        except Exception:
+            pass
+
         self.ui.backgroundLabel.hide()
         self.ui.avatarLabel.hide()
         self.frames_sprayed = 0
@@ -235,6 +333,7 @@ class HelpWidget(QWidget):
 
     def closeEvent(self, event):
         """处理窗口关闭事件，确保主窗口恢复可关闭状态"""
+        self.stop_update_check()
         try:
             # 假设父窗口是 ControlPanelWindow 的实例
             if self.parent() and hasattr(self.parent(), 'setClosable'):
@@ -246,6 +345,7 @@ class HelpWidget(QWidget):
 
     def on_ok_clicked(self):
         """点击确定按钮时，隐藏窗口并恢复主窗口的关闭功能"""
+        self.stop_update_check()
         try:
             # 停止动画，清理粒子，拆卸 overlay，避免在关闭时产生绘制或定时器调用的竞态
             if hasattr(self, 'animation_timer') and self.animation_timer is not None:
@@ -275,12 +375,112 @@ class HelpWidget(QWidget):
             except Exception:
                 pass
 
+    def set_update_status(self, text, level=None):
+        """更新状态文字，level 取 update/ok/error 决定颜色。"""
+        try:
+            color = UPDATE_STATUS_COLORS.get(level, UPDATE_STATUS_COLORS["ok"])
+            self.ui.updateStatusLabel.setStyleSheet(
+                f"#updateStatusLabel {{ color: {color}; background-color: transparent; }}"
+            )
+            self.ui.updateStatusLabel.setText(text)
+        except Exception:
+            pass
+
+    def on_check_update_clicked(self):
+        """点击“检查更新”。发现新版本后按钮变为“前往下载”。"""
+        try:
+            # 已有可下载链接：直接打开浏览器
+            if self.update_url:
+                QDesktopServices.openUrl(QUrl(self.update_url))
+                return
+
+            if self.update_task is not None:
+                return
+
+            prune_update_tasks()
+            self.set_update_status("正在检查更新…", None)
+            self.ui.checkUpdateButton.setEnabled(False)
+            self.ui.checkUpdateButton.setText("检查中…")
+
+            task = UpdateCheckTask()
+            task.signals.checked.connect(self.on_update_checked)
+            task.signals.failed.connect(self.on_update_failed)
+            self.update_task = task
+            _LIVE_UPDATE_TASKS.append(task)
+            QThreadPool.globalInstance().start(task)
+        except Exception as e:
+            self.set_update_status(f"检查失败：{e}", "error")
+            try:
+                self.ui.checkUpdateButton.setEnabled(True)
+                self.ui.checkUpdateButton.setText("检查更新")
+            except Exception:
+                pass
+
+    def on_update_checked(self, has_update, message, url):
+        """检查完成：有更新则切到下载按钮，否则只提示。"""
+        try:
+            self.release_update_task()
+            if has_update:
+                self.update_url = url or ""
+                self.set_update_status(message, "update")
+                self.ui.checkUpdateButton.setText("前往下载" if self.update_url else "检查更新")
+            else:
+                self.update_url = ""
+                self.set_update_status(message, "ok")
+                self.ui.checkUpdateButton.setText("检查更新")
+            self.ui.checkUpdateButton.setEnabled(True)
+        except Exception:
+            pass
+
+    def on_update_failed(self, message):
+        """检查失败：保留重试入口。"""
+        try:
+            self.release_update_task()
+            self.update_url = ""
+            self.set_update_status(f"检查失败：{message}", "error")
+            self.ui.checkUpdateButton.setText("重试")
+            self.ui.checkUpdateButton.setEnabled(True)
+        except Exception:
+            pass
+
+    def release_update_task(self):
+        """任务收尾：从存活列表移除，清掉引用。"""
+        try:
+            task = self.update_task
+            if task is not None and task in _LIVE_UPDATE_TASKS:
+                _LIVE_UPDATE_TASKS.remove(task)
+        except Exception:
+            pass
+        try:
+            self.update_task = None
+        except Exception:
+            pass
+
+    def stop_update_check(self):
+        """窗口关闭时通知任务别再发信号。"""
+        try:
+            if self.update_task is not None:
+                self.update_task.stop()
+        except Exception:
+            pass
+        prune_update_tasks()
+
+    def reset_update_button(self):
+        """窗口重新打开时，避免按钮停在“检查中…”。"""
+        try:
+            if self.update_task is None and self.ui.checkUpdateButton.text() == "检查中…":
+                self.ui.checkUpdateButton.setText("检查更新")
+                self.ui.checkUpdateButton.setEnabled(True)
+        except Exception:
+            pass
+
     def showEvent(self, event):
         """窗口显示时，重置并启动彩带动画"""
         super().showEvent(event)
         self.particles = []
         self.frames_sprayed = 0
         self.animation_timer.start(16)
+        self.reset_update_button()
 
     def resizeEvent(self, event):
         """窗口大小改变时，确保遮罩层也同步改变大小"""
