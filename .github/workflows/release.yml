@@ -60,7 +60,7 @@ jobs:
       - name: Rename artifact
         shell: pwsh
         run: Copy-Item dist/SJTURunningMan.exe ("SJTURunningMan_{0}_windows.exe" -f '${{ needs.meta.outputs.version }}')
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: win
           path: SJTURunningMan_*_windows.exe
@@ -99,7 +99,7 @@ jobs:
           hdiutil create -volname "SJTURunningMan ${VERSION}" \
             -srcfolder dist/SJTURunningMan.app -ov -format UDZO \
             "SJTURunningMan_${VERSION}_macOS.dmg"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: mac
           path: SJTURunningMan_*_macOS.dmg
@@ -151,7 +151,7 @@ jobs:
             --depends libdbus-1-3 --depends libfontconfig1 \
             -p "SJTURunningMan_${VERSION}_linux.deb" \
             -C pkgroot .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux
           path: SJTURunningMan_*_linux.deb
