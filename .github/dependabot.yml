@@ -54,6 +54,19 @@ updates:
           - "com.google.android.*"
           - "org.jetbrains.kotlin*"
           - "org.jetbrains.kotlinx*"
+    ignore:
+      # Compose BOM 2026.09 对应 Compose 1.12.1，要求 compileSdk >= 37，
+      # 而工程当前是 34。升级它必须先做平台级升级（装 android-37 SDK、
+      # 评估 targetSdk 变更），在此之前每周重开 PR 没有意义。
+      # 解除条件：compileSdk 升到 37 之后删掉这条。
+      - dependency-name: "androidx.compose:compose-bom"
+
+      # OkHttp 5.x 是跨大版本（4.12 -> 5.5），虽然当前用到的 API 面很小，
+      # 但仍需人工适配 + 真机验证。等专门做网络栈升级时再放开。
+      # 注：com.squareup.okhttp3:okhttp-urlconnection 全仓零引用，是多余的
+      #     依赖，下次动这块时应一并删除。
+      - dependency-name: "com.squareup.okhttp3:*"
+        versions: ["5.x"]
 
 # 说明：鸿蒙使用 oh-package.json5 + ohpm，不属于 Dependabot 支持的生态，
 #      依赖升级需手动在 DevEco Studio 中检查。

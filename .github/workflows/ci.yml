@@ -75,7 +75,7 @@ jobs:
           python -c "import qtui; print('qtui import OK')"
 
   android:
-    name: 安卓单元测试
+    name: 安卓构建与测试
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,7 +94,12 @@ jobs:
             "platforms;android-34" "build-tools;34.0.0" > /dev/null
 
       - name: 单元测试
-        run: ./gradlew --no-daemon testDebugUnitTest -Dorg.gradle.java.home="$JAVA_HOME"
+        # assembleDebugAndroidTest 一并执行：它才会拉取并编译 androidTest 依赖
+        # （androidx.test.ext:junit、espresso-core 等）。只跑 testDebugUnitTest
+        # 的话，androidTest 依赖升级出问题在 CI 上完全看不出来。
+        run: |
+          ./gradlew --no-daemon testDebugUnitTest assembleDebugAndroidTest \
+            -Dorg.gradle.java.home="$JAVA_HOME"
 
       - name: 上传测试报告
         if: always()
