@@ -80,11 +80,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     // OkHttp + Cookie 持久化
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:okhttp-urlconnection:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:okhttp-urlconnection:5.5.0")
 
     // Gson
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.14.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
