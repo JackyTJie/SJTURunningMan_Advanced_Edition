@@ -1,0 +1,43 @@
+[package]
+name = "sjturunningman"
+version = "4.5.0-beta.4"
+edition = "2021"
+rust-version = "1.95"
+description = "SJTU RunningMan desktop client (Tauri 2 + React 19)"
+publish = false
+build = "build.rs"
+
+[lib]
+name = "sjturunningman"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sjturunningman"
+path = "src/main.rs"
+
+[features]
+# `tauri build` / 发布构建启用；直接 `cargo build --release` 时要显式带上，
+# 否则 Tauri 会按开发模式去连 devUrl。开发用 `pnpm tauri dev`。
+custom-protocol = ["tauri/custom-protocol"]
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+directories = "6"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+rand = "0.9"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "cookies", "json", "multipart", "gzip", "rustls-tls"] }
+semver = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+webbrowser = "1"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+tempfile = "3"

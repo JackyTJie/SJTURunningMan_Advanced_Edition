@@ -1,0 +1,1858 @@
+/* ==========================================================================
+   Fonts — Roboto (Latin) + Material Symbols Rounded（按实际图标子集打包）
+   ========================================================================== */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/roboto-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: block;
+  src: url('/fonts/material-symbols-rounded.woff2') format('woff2');
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-ref-typeface-plain);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+}
+
+::selection {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+  background-color: var(--md-sys-color-outline-variant);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--md-sys-color-outline);
+}
+
+.mono {
+  font-family: var(--app-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+md-icon {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+md-outlined-text-field,
+md-outlined-select {
+  width: 100%;
+  --md-outlined-text-field-container-shape: var(--md-sys-shape-corner-extra-small);
+  --md-outlined-select-text-field-container-shape: var(--md-sys-shape-corner-extra-small);
+}
+
+md-filled-button,
+md-filled-tonal-button,
+md-outlined-button,
+md-text-button {
+  --md-filled-button-container-height: 40px;
+  --md-filled-tonal-button-container-height: 40px;
+  --md-outlined-button-container-height: 40px;
+  --md-text-button-container-height: 40px;
+}
+
+md-linear-progress {
+  --md-linear-progress-track-height: 4px;
+  --md-linear-progress-active-indicator-height: 4px;
+  --md-linear-progress-track-shape: var(--md-sys-shape-corner-full);
+  width: 100%;
+}
+
+/* ==========================================================================
+   Shell
+   ========================================================================== */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--md-sys-color-surface);
+}
+
+.app-drawer {
+  flex: 0 0 var(--app-sidebar-width);
+  height: 100%;
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  --md-navigation-drawer-container-width: var(--app-sidebar-width);
+  --md-navigation-drawer-container-color: var(--md-sys-color-surface-container-low);
+  --md-navigation-drawer-container-shape: 0;
+  --md-navigation-drawer-standard-container-elevation: 0;
+}
+
+.drawer-inner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  padding: 20px 14px 16px;
+  gap: 6px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 24px;
+}
+
+.brand-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  box-shadow: var(--app-elevation-1);
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.brand-name {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-medium-size);
+  line-height: var(--md-sys-typescale-title-medium-line-height);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.brand-sub {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  letter-spacing: 0.02em;
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  --md-list-container-color: transparent;
+}
+
+.nav-item {
+  height: 48px;
+  border-radius: var(--md-sys-shape-corner-full);
+  --md-list-item-one-line-container-height: 48px;
+  --md-list-item-top-space: 0;
+  --md-list-item-bottom-space: 0;
+  --md-list-item-leading-space: 16px;
+  --md-list-item-trailing-space: 16px;
+  --md-list-item-label-text-size: 0.875rem;
+  --md-list-item-label-text-weight: 500;
+  --md-list-item-leading-icon-color: var(--md-sys-color-on-surface-variant);
+  --md-list-item-label-text-color: var(--md-sys-color-on-surface-variant);
+  transition: background-color var(--app-motion-duration-short) var(--app-motion-standard);
+}
+
+.nav-item:hover {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.nav-item.is-active {
+  background: var(--md-sys-color-secondary-container);
+  --md-list-item-label-text-color: var(--md-sys-color-on-secondary-container);
+  --md-list-item-leading-icon-color: var(--md-sys-color-on-secondary-container);
+}
+
+.nav-item.is-active md-icon {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+.drawer-spacer {
+  flex: 1;
+}
+
+.drawer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 4px;
+  padding: 10px 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  overflow: hidden;
+}
+
+.drawer-status span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+  box-shadow: 0 0 0 3px var(--md-sys-color-surface-container);
+}
+
+.status-dot.is-online {
+  background: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px var(--md-sys-color-primary-container);
+}
+
+.drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 6px 2px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  opacity: 0.85;
+}
+
+.main-column {
+  isolation: isolate;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--md-sys-color-surface);
+}
+
+.top-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 28px 16px;
+}
+
+.top-bar-copy {
+  min-width: 0;
+}
+
+.top-bar-copy h1 {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-headline-small-size);
+  line-height: var(--md-sys-typescale-headline-small-line-height);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.top-bar-copy p {
+  margin-top: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.notice-host {
+  position: absolute;
+  top: 10px;
+  right: 28px;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  max-width: min(280px, calc(100% - 56px));
+  pointer-events: none;
+  animation: notice-in var(--app-motion-duration-medium) var(--app-motion-standard) backwards;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: var(--app-elevation-3);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  pointer-events: auto;
+}
+
+.notice md-icon {
+  margin-top: 1px;
+  color: var(--md-sys-color-inverse-primary);
+  --md-icon-size: 20px;
+}
+
+.notice-success {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.notice-success md-icon {
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.notice-error {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.notice-error md-icon {
+  color: var(--md-sys-color-on-error-container);
+}
+
+.content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 28px 28px;
+  scroll-behavior: smooth;
+}
+
+.page-logs {
+  overflow: hidden;
+}
+
+/* `backwards` 而非 `both`：动画结束后若保留 translateY(0)，
+   position: fixed 的下拉菜单会以这张卡片为包含块，而不是视口。 */
+.page > * {
+  animation: page-in var(--app-motion-duration-medium) var(--app-motion-standard) backwards;
+}
+
+/* ==========================================================================
+   Surfaces / cards
+   ========================================================================== */
+md-outlined-card.surface-card {
+  --md-outlined-card-container-color: var(--md-sys-color-surface-container-low);
+  --md-outlined-card-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-card-container-shape: var(--md-sys-shape-corner-large);
+  --md-outlined-card-container-elevation: 0;
+}
+
+md-elevated-card.surface-card {
+  --md-elevated-card-container-color: var(--md-sys-color-surface-container-low);
+  --md-elevated-card-container-elevation: 1;
+  --md-elevated-card-container-shape: var(--md-sys-shape-corner-large);
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.compact-header {
+  align-items: center;
+}
+
+.card-eyebrow {
+  margin-bottom: 2px;
+  color: var(--md-sys-color-primary);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.card-title {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-large-size);
+  line-height: var(--md-sys-typescale-title-large-line-height);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.card-sub {
+  margin-top: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.header-icon {
+  flex: 0 0 auto;
+  color: var(--md-sys-color-primary);
+  --md-icon-size: 24px;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card-actions.wrap {
+  flex-wrap: wrap;
+}
+
+.actions-spacer {
+  flex: 1;
+}
+
+.info-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.info-strip md-icon {
+  margin-top: 1px;
+  color: var(--md-sys-color-primary);
+  --md-icon-size: 20px;
+}
+
+.info-strip div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-strip strong {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  font-weight: 600;
+}
+
+.info-strip span {
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.inline-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.inline-alert md-icon {
+  --md-icon-size: 18px;
+}
+
+/* ==========================================================================
+   Workbench
+   ========================================================================== */
+.workbench-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.workbench-left {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* 参数卡的日期日历与下拉菜单要盖住下方预览卡片（单列布局时尤其明显）。 */
+.plan-card {
+  position: relative;
+  z-index: 2;
+}
+
+.plan-card .card-body {
+  gap: 16px;
+}
+
+.plan-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+}
+
+.plan-summary > md-icon {
+  margin-top: 1px;
+  color: var(--md-sys-color-primary);
+  --md-icon-size: 20px;
+}
+
+.plan-summary-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.plan-summary-title {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-summary-detail {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.plan-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-section-head md-icon {
+  color: var(--md-sys-color-primary);
+  --md-icon-size: 18px;
+}
+
+.plan-section-title {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-small-size);
+  line-height: var(--md-sys-typescale-title-small-line-height);
+  font-weight: 500;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* 距离控件比输入框高；把次数框的说明文字下移，与距离说明同一基线。 */
+.plan-card .runs-field {
+  --md-outlined-field-supporting-text-top-space: 16px;
+}
+
+.time-field {
+  min-width: 0;
+  cursor: pointer;
+}
+
+.time-field md-outlined-text-field {
+  display: block;
+  width: 100%;
+}
+
+/* md3.io 的时间输入把标签靠左排；让它居中到时 / 分 / 秒各自字段下方。 */
+.time-picker::part(input-label) {
+  text-align: center;
+}
+
+.distance-field {
+  min-width: 0;
+}
+
+.distance-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.distance-value {
+  color: var(--md-sys-color-primary);
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.distance-field m-slider {
+  display: block;
+  width: 100%;
+}
+
+/* md3.io starts track presses with a settling transition until its 3px drag
+   threshold. Direct manipulation must follow the value from the first frame. */
+.distance-field m-slider:active::part(handle),
+.distance-field m-slider:active::part(segment) {
+  transition: none;
+}
+
+.distance-support {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.switch-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--app-motion-duration-short) var(--app-motion-standard);
+}
+
+.switch-field:not(.is-disabled):hover {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.switch-field.is-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.switch-field md-switch {
+  flex: 0 0 auto;
+}
+
+.switch-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.switch-label {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  font-weight: 500;
+}
+
+.switch-support {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+}
+
+.semester-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.semester-value {
+  color: var(--md-sys-color-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.semester-sync { margin-left: auto; }
+
+.semester-progress {
+  width: 100%;
+  height: calc(var(--app-semester-progress-thickness) + 2 * var(--app-semester-progress-amplitude));
+}
+
+.semester-progress canvas { display: block; }
+
+
+/* ==========================================================================
+   Route preview
+   ========================================================================== */
+.preview-card {
+  position: relative;
+  z-index: 1;
+}
+
+.preview-card .card-body {
+  gap: 16px;
+}
+
+.preview-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.delete-icon {
+  color: var(--md-sys-color-error);
+  --md-icon-button-icon-color: var(--md-sys-color-error);
+}
+
+.route-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.route-badge.is-imported {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.route-map {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-large);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container);
+}
+
+.route-map svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.route-map-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--md-sys-color-surface-container);
+}
+
+.route-map.is-stale svg {
+  opacity: 0.55;
+  transition: opacity var(--app-motion-duration-medium) var(--app-motion-standard);
+}
+
+.map-dot {
+  fill: var(--md-sys-color-outline-variant);
+  opacity: 0.7;
+}
+
+.map-halo,
+.map-jump-halo {
+  fill: none;
+  stroke: var(--md-sys-color-surface);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.92;
+}
+
+.map-line,
+.map-jump {
+  fill: none;
+  stroke: var(--md-sys-color-primary);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-jump {
+  stroke: var(--md-sys-color-error);
+}
+
+.map-halo,
+.map-jump-halo {
+  vector-effect: non-scaling-stroke;
+}
+
+.map-start circle:first-child,
+.map-end circle:first-child {
+  fill: var(--md-sys-color-surface);
+  stroke: var(--md-sys-color-primary);
+  stroke-width: 2;
+}
+
+.map-start circle:last-child {
+  fill: var(--md-sys-color-primary);
+}
+
+.map-end circle:first-child {
+  stroke: var(--md-sys-color-error);
+}
+
+.map-end circle:last-child {
+  fill: var(--md-sys-color-error);
+}
+
+.map-empty text {
+  fill: var(--md-sys-color-on-surface-variant);
+  font-family: var(--md-ref-typeface-plain);
+  font-size: 16px;
+}
+
+.map-empty text.map-empty-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.route-map-stale {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 5px 10px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  box-shadow: var(--app-elevation-1);
+}
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 24px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.metric-label {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  letter-spacing: 0.02em;
+}
+
+.metric-value {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-large-size);
+  line-height: var(--md-sys-typescale-title-large-line-height);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-value small {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  font-weight: 400;
+  /* 继承 28px 行高会把整行撑高，导致三个指标的文字基线错位。 */
+  line-height: 1;
+}
+
+.metric-value.is-warning {
+  color: var(--md-sys-color-error);
+}
+
+.metric-legend {
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 14px;
+  padding-bottom: 6px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+}
+
+.marker {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--md-sys-color-primary);
+  background: var(--md-sys-color-surface);
+}
+
+.marker.end {
+  border-color: var(--md-sys-color-error);
+}
+
+.marker.start::after,
+.marker.end::after {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 3px;
+  margin: 1px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+}
+
+.marker.end::after {
+  background: var(--md-sys-color-error);
+}
+
+.danger-button {
+  --md-filled-button-container-color: var(--md-sys-color-error);
+  --md-filled-button-label-text-color: var(--md-sys-color-on-error);
+  --md-filled-button-icon-color: var(--md-sys-color-on-error);
+}
+
+.danger-outline {
+  --md-outlined-button-label-text-color: var(--md-sys-color-error);
+  --md-outlined-button-icon-color: var(--md-sys-color-error);
+  --md-outlined-button-outline-color: var(--md-sys-color-error);
+}
+
+/* ==========================================================================
+   Routes
+   ========================================================================== */
+.routes-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.route-list-card .card-body {
+  gap: 14px;
+}
+
+.route-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 -8px;
+  --md-list-container-color: transparent;
+}
+
+.route-list-item {
+  border-radius: var(--md-sys-shape-corner-medium);
+  --md-list-item-two-line-container-height: 64px;
+  --md-list-item-top-space: 10px;
+  --md-list-item-bottom-space: 10px;
+  --md-list-item-leading-space: 12px;
+  --md-list-item-trailing-space: 12px;
+  --md-list-item-label-text-size: 0.875rem;
+  --md-list-item-label-text-weight: 500;
+  transition: background-color var(--app-motion-duration-short) var(--app-motion-standard);
+}
+
+.route-list-item:hover {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.route-list-item.is-active {
+  background: var(--md-sys-color-secondary-container);
+  --md-list-item-leading-icon-color: var(--md-sys-color-on-secondary-container);
+  --md-list-item-label-text-color: var(--md-sys-color-on-secondary-container);
+  --md-list-item-supporting-text-color: var(--md-sys-color-on-secondary-container);
+}
+
+.route-list-item.is-active md-icon {
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+.route-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-list-foot {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.route-list-foot md-icon {
+  --md-icon-size: 18px;
+  color: var(--md-sys-color-primary);
+}
+
+/* ==========================================================================
+   Logs & calendar
+   ========================================================================== */
+.logs-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.02fr) minmax(0, 1fr);
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+}
+
+.calendar-card,
+.log-card {
+  min-height: 0;
+}
+
+.calendar-card .card-body,
+.log-card .card-body {
+  height: 100%;
+  min-height: 0;
+  gap: 16px;
+}
+
+.calendar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.valid {
+  background: var(--md-sys-color-primary);
+}
+
+.legend-dot.invalid {
+  border: 1.5px solid var(--md-sys-color-error);
+  background: transparent;
+}
+
+.legend-dot.none {
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+  text-align: center;
+}
+
+.calendar-months {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calendar-month-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calendar-month-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-label-medium-size);
+  line-height: var(--md-sys-typescale-label-medium-line-height);
+  font-weight: 500;
+}
+
+.calendar-month-hint {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  font-weight: 400;
+}
+
+.calendar-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  max-height: 36px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid transparent;
+}
+
+.calendar-day.day-none {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.calendar-day.day-valid {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  font-weight: 500;
+}
+
+.calendar-day.day-invalid {
+  border-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-error);
+}
+
+.calendar-day.day-empty {
+  background: transparent;
+}
+
+.calendar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+}
+
+.calendar-empty md-icon {
+  --md-icon-size: 32px;
+  color: var(--md-sys-color-outline);
+}
+
+.log-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0;
+  border-radius: var(--md-sys-shape-corner-medium);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-lowest);
+}
+
+.log-line {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 14px;
+  align-items: baseline;
+}
+
+.log-line:hover {
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.log-time {
+  color: var(--md-sys-color-on-surface-variant);
+  font-family: var(--app-font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.log-message {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+  overflow-wrap: anywhere;
+}
+
+.log-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  min-height: 220px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.log-empty md-icon {
+  --md-icon-size: 32px;
+  color: var(--md-sys-color-outline);
+}
+
+.log-empty span {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  font-weight: 500;
+}
+
+.log-empty small {
+  font-size: var(--md-sys-typescale-body-small-size);
+}
+
+/* ==========================================================================
+   About
+   ========================================================================== */
+.about-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.about-hero .about-hero-body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 28px;
+}
+
+.about-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  box-shadow: var(--app-elevation-2);
+}
+
+.about-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.about-copy h2 {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-headline-small-size);
+  line-height: var(--md-sys-typescale-headline-small-line-height);
+  font-weight: 500;
+}
+
+.about-version {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-medium-size);
+  line-height: var(--md-sys-typescale-label-medium-line-height);
+}
+
+.about-desc {
+  margin-top: 10px;
+  max-width: 56ch;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.about-badge {
+  align-self: flex-start;
+  padding: 5px 10px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  font-size: var(--md-sys-typescale-label-small-size);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.about-grid > md-outlined-card {
+  height: 100%;
+}
+
+.about-grid .card-body {
+  height: 100%;
+}
+
+.community-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+:root[data-theme='dark'] .github-icon {
+  filter: invert(1);
+}
+
+.about-grid .about-meta {
+  margin-top: auto;
+}
+
+.about-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.about-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+}
+
+.about-meta-item span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  line-height: var(--md-sys-typescale-label-small-line-height);
+}
+
+.about-meta-item strong {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+  font-weight: 500;
+}
+
+.about-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.about-list li::marker {
+  color: var(--md-sys-color-primary);
+}
+
+.about-segments {
+  flex: 0 0 auto;
+}
+
+.about-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+}
+
+/* ==========================================================================
+   Task bar
+   ========================================================================== */
+.task-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin: 0 28px 20px;
+  padding: 14px 18px;
+  border-radius: var(--md-sys-shape-corner-large);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container);
+}
+
+.task-bar.is-busy {
+  border-color: var(--md-sys-color-primary);
+}
+
+.task-bar-status {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-bar-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-status-text {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-progress-text {
+  margin-left: auto;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  white-space: nowrap;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 4px var(--md-sys-color-primary-container);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.idle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+}
+
+.task-bar-compact {
+  gap: 16px;
+  margin: 0 28px 12px;
+  padding: 10px 16px;
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.task-bar-compact .task-bar-status {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--md-sys-typescale-body-small-size);
+}
+
+.task-bar-compact md-linear-progress {
+  flex: 1;
+  max-width: 280px;
+}
+
+/* ==========================================================================
+   Dialogs
+   ========================================================================== */
+md-dialog {
+  --md-dialog-container-color: var(--md-sys-color-surface-container-high);
+  --md-dialog-headline-color: var(--md-sys-color-on-surface);
+  --md-dialog-supporting-text-color: var(--md-sys-color-on-surface-variant);
+  --md-dialog-icon-color: var(--md-sys-color-primary);
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: min(400px, 72vw);
+}
+
+.login-dialog .dialog-form {
+  min-width: min(420px, 72vw);
+}
+
+.dialog-lead {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.dialog-lead strong {
+  color: var(--md-sys-color-on-surface);
+}
+
+.dialog-note {
+  margin-top: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.consent-dialog .consent-body {
+  max-width: 540px;
+}
+
+.consent-body p {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.consent-body ol {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.consent-body li::marker {
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+  cursor: pointer;
+}
+
+.checkbox-row md-checkbox {
+  flex: 0 0 auto;
+  margin-top: calc((var(--md-sys-typescale-body-medium-line-height) - 18px) / 2);
+}
+
+.captcha-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.captcha-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.captcha-image-box {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-small);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.captcha-image-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.two-factor-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   Loading
+   ========================================================================== */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  height: 100vh;
+  padding: 32px;
+  text-align: center;
+  background: radial-gradient(
+    120% 90% at 50% -10%,
+    var(--md-sys-color-primary-container) 0%,
+    var(--md-sys-color-surface) 62%
+  );
+}
+
+.loading-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  box-shadow: var(--app-elevation-2);
+}
+
+.loading-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loading-title {
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-headline-small-size);
+  line-height: var(--md-sys-typescale-headline-small-line-height);
+  font-weight: 500;
+}
+
+.loading-sub {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-medium-size);
+  line-height: var(--md-sys-typescale-body-medium-line-height);
+}
+
+.fatal-icon {
+  color: var(--md-sys-color-error);
+  --md-icon-size: 48px;
+}
+
+/* ==========================================================================
+   Motion
+   ========================================================================== */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .workbench-grid,
+  .routes-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .logs-grid {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+  }
+}
+
+/* The upstream date picker carries its own scoped styles in its shadow root. */
+.md3-date-field {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  /* 浮起的标签会遮住描边，需要与所在卡片同色。 */
+  --app-date-label-surface: var(--md-sys-color-surface-container-low);
+}
+
+/* Float the upstream label onto the outline so the date field lines up with
+   md-outlined-text-field instead of stacking an extra label above the box. */
+.md3-date-field::part(label) {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  z-index: 2;
+  margin: 0;
+  padding: 0 4px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--app-date-label-surface);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-body-small-size);
+  line-height: var(--md-sys-typescale-body-small-line-height);
+}
+
+.md3-date-field::part(input) {
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+.md3-date-field::part(calendar) {
+  box-shadow: var(--app-elevation-3);
+}
+
+.md3-date-field::part(calendar) {
+  max-height: calc(100dvh - 32px);
+}
+
+/* Compact date cells leave room for record markers in the modal. */
+.md3-date-field::part(cell),
+.md3-date-field::part(day) {
+  height: 36px;
+}
+
+.md3-date-field::part(day) {
+  font-size: var(--md-sys-typescale-body-medium-size);
+}
+
+.md3-date-field::part(weekday) {
+  height: 32px;
+  font-size: var(--md-sys-typescale-body-small-size);
+}
+
+.md3-date-field::part(day)::before,
+.md3-date-field::part(day)::after {
+  width: 32px;
+  height: 32px;
+}
+
+/* The distance control uses a plain track without ticks or endpoint dots. */
+.distance-field m-slider::part(dot) {
+  display: none;
+}
+
+/* Decorative overlay; all controls remain interactive. */
+.task-celebration {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: var(--app-confetti-layer);
+}
+
+/* Record markers stay visible alongside the upstream selected/today styles. */
+.md3-date-field::part(record-valid) {
+  text-decoration: underline solid var(--md-sys-color-primary) 3px;
+  text-underline-offset: 5px;
+}
+
+.md3-date-field::part(record-invalid) {
+  text-decoration: underline dotted var(--md-sys-color-error) 3px;
+  text-underline-offset: 5px;
+}

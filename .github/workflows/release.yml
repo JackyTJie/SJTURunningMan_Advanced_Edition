@@ -3,8 +3,8 @@ name: Release
 # 推 tag 触发，`4.5.0` 与 `v4.5.0` 两种写法都认；也可手动指定已有 tag 重跑。
 #
 # ⚠️ 只适用于桌面迁移后（v4.5.0 起）的 tag：构建作业 checkout 该 tag 的源码树，再调用
-#    迁移后的构建文件（`desktop/`、Rust 版 `build_windows.ps1`、`scripts/package_desktop.py`）。
-#    重跑迁移前的 tag 会直接失败。tag 必须与 `desktop/Cargo.toml` 的 version 一致，
+#    迁移后的构建文件（`desktop/`、Tauri 2 版 `build_windows.ps1`、`scripts/package_desktop.py`）。
+#    重跑迁移前的 tag 会直接失败。tag 必须与 `desktop/src-tauri/Cargo.toml` 的 version 一致，
 #    meta 作业会断言这一点。
 #
 # 正确顺序：
@@ -49,10 +49,12 @@ jobs:
       tag: ${{ steps.ver.outputs.tag }}
     steps:
       - id: ver
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
         run: |
           TAG="${GITHUB_REF_NAME}"   # workflow_dispatch 时 GITHUB_REF_NAME 是分支名，需覆盖
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
+            TAG="$REQUESTED_TAG"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
@@ -60,13 +62,13 @@ jobs:
         with:
           ref: ${{ steps.ver.outputs.tag }}
           fetch-depth: 1
-      - name: 校验 tag 与 desktop/Cargo.toml 版本一致
+      - name: 校验 tag 与 desktop/src-tauri/Cargo.toml 版本一致
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          manifest=$(sed -n 's/^version = "\(.*\)"/\1/p' desktop/Cargo.toml | head -1)
+          manifest=$(sed -n 's/^version = "\(.*\)"/\1/p' desktop/src-tauri/Cargo.toml | head -1)
           if [ "$manifest" != "$VERSION" ]; then
-            echo "::error::desktop/Cargo.toml 的 version ($manifest) 与 tag ($VERSION) 不一致，请先统一版本号"
+            echo "::error::desktop/src-tauri/Cargo.toml 的 version ($manifest) 与 tag ($VERSION) 不一致，请先统一版本号"
             exit 1
           fi
           echo "desktop 版本 $manifest 与 tag 一致"
@@ -83,6 +85,18 @@ jobs:
         with:
           ref: ${{ needs.meta.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm --dir desktop build
       - name: Test native desktop
         run: cargo test --workspace --locked
       - name: Build native exe
@@ -118,14 +132,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-apple-darwin, aarch64-apple-darwin
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm --dir desktop build
       - name: Test native desktop
         run: cargo test --workspace --locked
       - name: Build universal app and dmg
         env:
           APP_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --release --locked --target x86_64-apple-darwin
-          cargo build --release --locked --target aarch64-apple-darwin
+          cargo build --release --locked --features custom-protocol --target x86_64-apple-darwin
+          cargo build --release --locked --features custom-protocol --target aarch64-apple-darwin
           mkdir -p dist
           lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
           lipo dist/SJTURunningMan -verify_arch x86_64 arm64
@@ -153,14 +179,30 @@ jobs:
           ref: ${{ needs.meta.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Install native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libxdo-dev libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
+            libsoup-3.0-dev
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm --dir desktop build
       - name: Test native desktop
         run: cargo test --workspace --locked
       - name: Build and package deb
         env:
           APP_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --release --locked
+          cargo build --release --locked --features custom-protocol
           python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
       - name: 生成来源证明
         uses: actions/attest-build-provenance@v4
@@ -185,14 +227,30 @@ jobs:
           ref: ${{ needs.meta.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Install native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libxdo-dev libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
+            libsoup-3.0-dev
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Build frontend
+        run: pnpm --dir desktop build
       - name: Test native desktop
         run: cargo test --workspace --locked
       - name: Build and package deb
         env:
           APP_VERSION: ${{ needs.meta.outputs.version }}
         run: |
-          cargo build --release --locked
+          cargo build --release --locked --features custom-protocol
           python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch arm64
       - name: 生成来源证明
         uses: actions/attest-build-provenance@v4

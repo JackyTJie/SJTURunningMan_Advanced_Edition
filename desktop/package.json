@@ -1,0 +1,36 @@
+{
+  "name": "sjturunningman-desktop",
+  "private": true,
+  "version": "4.5.0-beta.4",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "theme": "node scripts/generate-theme.mjs",
+    "check:e2e": "node e2e/check.mjs",
+    "screenshots": "node e2e/screenshot.mjs"
+  },
+  "dependencies": {
+    "@material/web": "2.5.0",
+    "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-dialog": "2.8.3",
+    "canvas-confetti": "1.9.4",
+    "material": "3.2.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@material/material-color-utilities": "0.3.0",
+    "@playwright/test": "1.64.1",
+    "@tauri-apps/cli": "2.12.4",
+    "@types/canvas-confetti": "1.9.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  },
+  "packageManager": "pnpm@11.22.0"
+}

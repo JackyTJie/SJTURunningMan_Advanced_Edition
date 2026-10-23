@@ -1,0 +1,73 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SJTU RunningMan",
+  "identifier": "com.sjtu.runningman",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "SJTU RunningMan",
+        "width": 1200,
+        "height": 840,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "visible": false,
+        "theme": "Light",
+        "backgroundColor": "#fdfbff"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ipc: http://ipc.localhost; frame-src http://127.0.0.1:*",
+      "devCsp": "default-src 'self'; img-src 'self' data: blob:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; frame-src http://127.0.0.1:*"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Education",
+    "shortDescription": "SJTU 校园跑桌面客户端",
+    "longDescription": "SJTU RunningMan 桌面客户端：离线轨迹预览、路线管理、学期统计与任务日志。",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libc6 (>= 2.39)",
+          "libgcc-s1",
+          "libx11-6",
+          "libx11-xcb1",
+          "libxcb1",
+          "libxcb-render0",
+          "libxcb-shm0",
+          "libxkbcommon0",
+          "libxkbcommon-x11-0",
+          "libxrandr2",
+          "libxi6",
+          "libxcursor1",
+          "libwayland-client0",
+          "libgtk-3-0",
+          "libwebkit2gtk-4.1-0",
+          "libjavascriptcoregtk-4.1-0",
+          "libsoup-3.0-0"
+        ]
+      }
+    }
+  }
+}

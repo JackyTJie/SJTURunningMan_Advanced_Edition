@@ -4,7 +4,7 @@ The four platforms build independently. Build only the one you changed.
 
 | Platform | Directory | Toolchain | Artifact |
 | --- | --- | --- | --- |
-| Desktop | repository root | Rust + Slint / Cargo | `.exe` / `.dmg` / `.deb` |
+| Desktop | repository root + `desktop/` | Rust 1.95+ / Tauri 2 / pnpm + Node 22+ | `.exe` / `.dmg` / `.deb` |
 | Android | `apps/android/` | Gradle 9.4.1 + AGP 8.13.0 + Kotlin 2.2.10 | `.apk` / `.aab` |
 | iOS | `apps/ios/` | Xcode 16+ | `.ipa` |
 | HarmonyOS | `apps/harmonyos/` | DevEco Studio / hvigor | `.hap` |
@@ -15,33 +15,40 @@ The four platforms build independently. Build only the one you changed.
 
 ### Run from source
 
-To just run the desktop client without building an installer:
+To run the desktop client without building an installer:
 
 ```bash
 git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
 cd SJTURunningMan_Advanced_Edition
-cargo run --locked -p sjturunningman
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop tauri dev
 ```
 
-Requires Rust 1.95+ (install stable with `rustup`) and a native C/C++ linker toolchain; running the desktop client needs no Python, Qt, or WebView. Per-OS dependencies are listed in the next section. The first launch still requires accepting the usage pledge.
+Requires Rust 1.95+, Node.js 22+, pnpm 11+ and the Tauri system dependencies for your OS. The desktop client uses the system WebView (WebView2 / WKWebView / WebKitGTK) and bundles no Chromium, Qt or Python. The first launch still requires accepting the usage pledge.
 
-### Native desktop
+> `pnpm tauri dev` starts both Vite on port 1420 and the Tauri window. A bare `cargo run` is a Tauri development build that expects that dev server; production builds must enable `custom-protocol`.
+
+### Native desktop and frontend
 
 ```bash
-# Current stable Rust (1.95+); Cargo.lock pins dependencies
-cargo run --locked -p sjturunningman
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop build            # tsc --noEmit + vite build
 cargo test --workspace --locked
-cargo build --release --locked
+cargo build --release --locked -p sjturunningman --features custom-protocol
+
+# Or let the Tauri CLI build both the frontend and the bundle
+pnpm --dir desktop tauri build
 ```
 
-Windows: install Rust 1.95+ plus MSVC Build Tools or MinGW-w64. `./build_windows.ps1` creates `dist/SJTURunningMan.exe`. The MSVC target uses static CRT via `.cargo/config.toml`; this session tested the GNU toolchain.
+Windows: install Rust 1.95+, Node 22+, pnpm 11+ plus MSVC Build Tools or MinGW-w64. `./build_windows.ps1` builds the frontend first and creates `dist/SJTURunningMan.exe`. The MSVC target uses static CRT via `.cargo/config.toml`; this session tested the GNU toolchain. End users need the WebView2 Runtime (preinstalled on most Windows 10/11 systems).
 
 macOS (Xcode command line tools required):
 
 ```bash
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
-MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target x86_64-apple-darwin
-MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target aarch64-apple-darwin
+pnpm --dir desktop build
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target x86_64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target aarch64-apple-darwin
 mkdir -p dist
 lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
 python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
@@ -50,19 +57,22 @@ python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 Linux (Ubuntu 24.04, X11 / Wayland):
 
 ```bash
-sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
-cargo build --release --locked
+sudo apt-get install build-essential pkg-config libssl-dev libxdo-dev \
+  libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+  libayatana-appindicator3-dev libsoup-3.0-dev
+pnpm --dir desktop build
+cargo build --release --locked --features custom-protocol
 python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`APP_VERSION` overrides the displayed version; otherwise `desktop/build.rs` takes `package.version` from `desktop/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release uses software rendering and embedded resources; Qt / Python / WebView are not bundled. The legacy Python modules, `requirements.txt`, and the PyInstaller configuration have all been removed; only the packaging scripts under `scripts/` still use Python.
+`APP_VERSION` overrides the displayed version; otherwise `desktop/src-tauri/build.rs` takes `package.version` from `desktop/src-tauri/Cargo.toml`, and `release.yml` asserts that it matches the tag. Python is used only for packaging scripts, never at application runtime. Release embeds the frontend and font subsets; Qt / Python / Chromium are not bundled, and Linux uses the system WebKitGTK. The legacy Python modules, `requirements.txt`, and the PyInstaller configuration have all been removed; only the packaging scripts under `scripts/` still use Python.
 
 ### Desktop checks and release builds
 
-`Native desktop checks` (`.github/workflows/desktop-check.yml`) runs on desktop push/PR changes and supports **Run workflow** in Actions. It only runs `cargo fmt`, `cargo clippy`, `cargo test`, and the packaging-layout tests on Ubuntu. It builds no installers and normally finishes in a few minutes.
+`Native desktop checks` (`.github/workflows/desktop-check.yml`) runs on desktop push/PR changes and supports **Run workflow** in Actions. It installs the frontend, runs `tsc --noEmit` + Vite build, then `cargo fmt`, `cargo clippy`, `cargo test`, and the packaging-layout tests on Ubuntu. It builds no installers and normally finishes in a few minutes.
 
-The Windows exe, macOS universal2 DMG, and Linux amd64/arm64 debs are built, verified, and uploaded by [`.github/workflows/release.yml`](../.github/workflows/release.yml) on a tag push or manual release; the PC three-platform smoke checks also run there. macOS uses ad-hoc signing, without Developer ID or notarization.
+The Windows exe, macOS universal2 DMG, and Linux amd64/arm64 debs are built, verified, and uploaded by [`.github/workflows/release.yml`](../../.github/workflows/release.yml) on a tag push or manual release. macOS uses ad-hoc signing, without Developer ID or notarization. The real-WebView `--ui-smoke-test` needs a graphical session and is run locally rather than in the release pipeline.
 
 ### Automated release
 

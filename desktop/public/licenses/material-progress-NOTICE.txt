@@ -1,0 +1,29 @@
+Material Components Android — determinate linear Wavy drawing and motion
+Copyright (C) 2020 The Android Open Source Project
+Apache License 2.0 (see Apache-2.0.txt).
+Revision: 66b0eeb53afeb6025ffbbd37734b08e5bce197ed
+Source: https://github.com/material-components/material-components-android
+
+AndroidX SpringForce / SpringAnimation
+Copyright (C) 2017 The Android Open Source Project
+Apache License 2.0 (see Apache-2.0.txt).
+Revision: 39d4ffd2a6d42d25c4f98cda5a7508487a975651
+Source: https://github.com/androidx/androidx
+
+AOSP Path / PathInterpolator
+Copyright (C) 2006, 2013 The Android Open Source Project
+Apache License 2.0 (see Apache-2.0.txt).
+Source: https://android.googlesource.com/platform/frameworks/base
+Version: android-16.0.0_r1
+
+Skia contour measurement and cubic subdivision
+Copyright 2006 Google Inc. / Copyright 2018 Google LLC
+BSD-3-Clause (see Skia-BSD.txt).
+Revision: b33356d6ccf1fe2692e3b616b257f07f78414c47
+Source: https://github.com/google/skia
+
+Modified for SJTU RunningMan: default rounded determinate Wavy drawing and
+animation translated to TypeScript/Canvas2D. Android PathMeasure is adapted
+from Skia cubic measurement; spring and easing follow AndroidX/AOSP. CSS dp,
+theme, requestAnimationFrame, visibility and reduced-motion bridge Web APIs.
+This is a source-derived port, not an official Google Web component.

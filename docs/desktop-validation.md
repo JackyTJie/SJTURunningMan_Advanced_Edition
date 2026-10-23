@@ -1,4 +1,6 @@
-# Rust + Slint 桌面迁移验证
+# 桌面迁移验证
+
+> 本文按时间记录桌面端的迁移与验收。2026-10-22 起为 **Tauri 2 + React 19 + Material Design 3**；此前各节是已退役的 **Rust + Slint** 界面，保留作历史对照。
 
 日期：2026-10-16。验证环境：Windows x86_64，Rust 1.95.0（MSYS2 GNU），Slint 1.15.1。
 
@@ -32,7 +34,7 @@
 ## 迁移注意事项
 
 - 登录保留旧版自动识别图形验证码；识别服务异常时才显示手动备用输入。
-- 保留旧客户端坐标校准、固定 200 m 距离补偿、开始时间波动及 payload 字段；采样器重新实现，并保留拐点避免距离缩短。
+- 保留旧客户端坐标校准、固定 200 m 距离补偿、开始时间波动及 payload 字段；采样器重新实现，并保留拐点避免距离缩短。（该补偿已于 2026-10-22 的 Tauri 迁移中取消，见下文「Tauri 2 + React 19 迁移验证」。）
 - 长于目标的路线自动截取；旧 Qt 的「沿完整路线」选择不再出现。实际生成长度会显示在预览中。
 - 旧路线需通过「导入 TXT」迁移到用户数据目录。旧 Python 模块 `src/`、`utils/` 与 `assets/resources_rc.py` 已一并移除：后者只被 `src/info_dialog.py` 副作用导入，内嵌的 `:/resources/` 资源没有任何代码引用，也没有对应的松散文件，因此无需迁移。
 
@@ -88,6 +90,8 @@
 
 ## 百度 / OpenStreetMap 双引擎（2026-10-17）
 
+> 2026-10-22 起，路线预览改为固定 OpenStreetMap；规划器仍保留双引擎。以下为当时的验收记录。
+
 用户实测 OSM 在当前网络不可用，而 Rust 版把旧 Qt 的百度底图删掉了。本轮把 provider 选择放回 HTML 页面：预览页与规划器均**默认百度地图**，页面内可切 OpenStreetMap，不改 Slint 应用界面。坐标契约不变：规划器统一存 BD09，百度点击直接入库，OSM 点击 WGS84 → BD09；预览页收到 GCJ02，显示时转百度 BD09 或 OSM WGS84。
 
 本机 macOS 27 arm64、Rust 1.99.1、Release 构建，`--map-smoke-test` 生成两页后用 Headless Chrome 154 + CDP 实测：
@@ -111,3 +115,151 @@
 - 自动化：`cargo test --workspace --locked` 为 44 项通过、1 项真实验证码测试忽略（另有 2 项二进制测试），新增覆盖请求顺序、登录重定向、`code != 0`、缺失 `semesterId`、同日有效+无效、缺失 `percent` 时的推导，以及日历跨月/跨年、补齐空白格、区间外日期与占位区间。`cargo fmt --all -- --check` 与 `cargo clippy --workspace --all-targets --locked -- -D warnings` 在 Rust 1.99.1 下干净。
 - `--smoke-test` 新增两个确定性夹具：已登录状态下的首页统计数值，以及固定学期范围（2026-09-14 起）的日历，含计入成绩、无效记录与落在区间外的日期。截图从 28 张增加到 30 张，`snapshot_count` 改为按输出目录内实际 PNG 数量推导，不再沿用硬编码值；报告另记 `semester_stats_placeholder` 与 `semester_stats_fixture_rows`。本次构建的像素统计（浅色主题、1493×1093 窗口、日历配色每通道容差 ±3、强调色 ±6）确认第 30 张截图同时出现三种日历配色：计入成绩 2609 px、无效记录 548 px、未跑 33787 px；第 29 张首页截图的强调色 `#236849` 共 14741 px、左半区 4232 px，而占位截图 `02-screen.png` 为 10611 px、左半区仅 134 px，说明统计卡片确实渲染了夹具数值。夹具数值与日期均为本地常量，测试不登录、不上传。
 - 尚未验证：真实账号登录后的达标公里与完成率数值、无效记录在真实数据下的颜色与日期归属、macOS / Linux 真机上卡片与两栏布局的视觉表现，以及 1040×700 最小窗口下两栏是否溢出。上一节的 28 张截图记录属于此前的构建，保持不变。
+
+## Tauri 2 + React 19 迁移验证（2026-10-22）
+
+环境：macOS arm64、Rust 1.95.0、Node 24.18.1、pnpm 11.22.0、Tauri 2.12.5、React 19.3.1、`@material/web` 2.5.0。以上各节记录的是已退役的 Rust + Slint 界面，保留作历史对照；本节对应当前桌面端。
+
+### 结构与依赖
+
+- 前端移到 `desktop/`：React 19 + TypeScript + Vite 8，组件只从 `@material/web`（含 labs 的 outlined/elevated card、navigation drawer、segmented button）引入；未引入其他 UI 组件库。`md-outlined-select`、`md-outlined-text-field`、`md-switch`、`md-checkbox`、`md-dialog`、`md-linear-progress`、`md-list` 等均使用官方实现。
+- Rust 业务模块原样迁入 `desktop/src-tauri/src/`：`api.rs`、`route.rs`、`task.rs`、`settings.rs`、`stats.rs`、`maps.rs`、`update.rs` 的请求、采样、坐标、排程与统计逻辑未改；新增 `commands.rs` 只做 Tauri 命令、状态与后台线程编排。`preview.rs` 从 Slint 图片改为验证码 data URL 适配；轨迹改由前端 SVG 绘制。
+- 移除 `slint`、`slint-build`、`tiny-skia`、`rfd`；新增 `tauri`、`tauri-build`、`tauri-plugin-dialog`、`base64`。Cargo workspace 成员改为 `desktop/src-tauri`。
+- 版本号唯一来源仍是 `desktop/src-tauri/Cargo.toml` 的 `package.version`；`build.rs` 保留 `APP_VERSION` 覆盖与 Windows 资源处理。
+
+### 设计系统
+
+- 颜色由 Google 官方 `material-color-utilities` 以 `#335C9C` 为种子生成完整 MD3 light/dark 角色（含 surface-container、fixed、inverse、outline、error），脚本在 `desktop/scripts/generate-theme.mjs`，产物提交为 `desktop/src/styles/tokens.css`。旧品牌绿不再出现。
+- 排版使用 MD3 type scale；Roboto 与 Material Symbols Rounded 只打包实际用到的子集（约 42 KB + 60 KB），中文回退到 PingFang SC / Microsoft YaHei UI / Noto Sans CJK。
+- 形状：卡片 16 px、对话框 28 px、按钮全圆角、文本框 4 px；层级使用 MD3 elevation token；动效 150/250/400 ms + standard easing，并尊重 `prefers-reduced-motion`。
+- 页面：侧栏 248 px 永久导航；工作台两栏（计划 / 预览 + 学期进度）；路线管理左侧路线列表 + 右侧预览；任务日志左右两栏；关于页 hero + 更新/说明卡片。模态覆盖承诺书、登录、二次验证、删除路线、开始任务。
+
+### 自动化结果
+
+- `cargo test --workspace --locked`：58 项通过，1 项真实网络验证码测试忽略。新增 2FA 页面字段提取、隐藏字段提交与错误码映射测试。
+- `cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets --locked -- -D warnings`：干净。
+- `pnpm --dir desktop build`：`tsc --noEmit` 与 Vite 生产构建通过；JS 约 571 KB（gzip 142 KB），CSS 约 38 KB。
+- `python3 -m unittest discover -s scripts -p "test_*.py"`：5 项打包布局测试通过，已断言 deb 依赖 WebKitGTK 4.1 / GTK 3。
+- macOS arm64 Release 二进制约 7.4 MB（LTO + strip）。Release（`cargo build --release -p sjturunningman --features custom-protocol`）运行 `--ui-smoke-test target/ui-smoke`：真实 WKWebView 中 `workbenchRendered`、`materialWeb`、`routeMap`、`consentDialog`、`consentChecked`、`consentClosed`、`routesPage`、`logsPage`、`aboutPage` 全部为 true，`fontsLoaded` 与 `primaryToken` 也为 true，`navItems = 4`，退出码 0。
+- Playwright mock 检查 `desktop/e2e/check.mjs`：表单绑定、下拉框、开关、主题、分段按钮、自动验证码登录、学期统计、任务事件、二次验证账号回填与日志全部通过。`desktop/e2e/screenshot.mjs` 生成 15 张 1200×840 / 1000×700 的浅色、深色、四页面与弹窗截图，人工检查了间距、换行、滚动与对比度。
+- 后端 `--smoke-test`：默认路线、4.00 km 离线预览、错误参数与 26 周占位日历通过。
+
+### 迁移注意
+
+- 直接 `cargo run` 属于 Tauri 开发模式，会连接 `http://localhost:1420`；开发用 `pnpm --dir desktop tauri dev`。发布/打包必须带 `--features custom-protocol`，否则前端资源不会按生产模式加载。
+- 真实窗口显示依赖系统 WebView；Linux 需 WebKitGTK 4.1，Windows 需 WebView2 Runtime。
+- `--smoke-test` 现在是后端离线检查；真实界面检查用 `--ui-smoke-test`，Playwright 只用于 mock 视觉/交互检查。
+- 路线预览地图改为嵌入预览卡片，规划器仍通过系统浏览器打开；坐标契约、上传 payload 与自动排计划逻辑未变。采样距离统一为所选单次距离，固定 200 m 补偿已取消，地图预览的缓存回退分支与上传生成同一口径。
+
+### 尚未验证
+
+- Windows MSVC / WebView2 与 Linux WebKitGTK / X11 / Wayland 的真机构建、安装与视觉表现。
+- 运动记录上传仍需真实账号验收；账号登录与二次验证已于 2026-10-22 由用户使用真实账号复测通过。
+- macOS 原生窗口截图（本环境无屏幕录制权限）；真实窗口的 DOM 冒烟已通过。
+
+## 二次验证提交修复（2026-10-22）
+
+### 现象
+
+用户输入正确的 JAccount 账号、密码和 6 位二次验证码后，客户端持续提示「二次验证码无效或已过期，请重试或重新发送」，无法完成登录；同一账号通过网页 / 安卓 WebView 登录正常。
+
+### 根因
+
+- 旧 Rust 登录在 `ulogin` 返回二次验证后，把 JSON 里的下一跳直接当作普通页面 `GET`。该地址可能只接受 `POST`，额外请求会失败或改变服务端 2FA 状态；即使加载成功，页面里的账号与隐藏字段也被丢弃。
+- `verify_code` 固定使用用户输入的账号，只提交 `account` / `captcha` / `trust`，没有使用 2FA 页面表单实际携带的账号（可能是邮箱或登录名）以及 `sid` / `uuid` / CSRF token 等字段。
+- 服务端返回任何非 0 `errno` 时，客户端统一压成「验证码无效或已过期」，无法区分验证码过期、`Invalid request`、会话失效等情况。
+
+安卓版使用系统 WebView 加载官方登录 / 2FA 页面，字段由页面自身提交，因此不受该问题影响。
+
+### 修复
+
+- `Session` 增加 `TwoFactorContext`，保存 2FA 页面 / URL / JSON 中的账号、白名单隐藏字段和验证完成地址；`Session` 克隆时共享该上下文，`send_code` 与 `verify_code` 使用同一会话。
+- 识别到二次验证后容错加载下一跳：页面加载失败（如只接受 POST 的 405）不再中断流程；仅当页面确实包含 2FA 标记时提取字段。
+- 提交验证码时优先使用页面 / URL 提供的账号，回退到用户输入账号；附带 `sid`、`uuid`、`csrf`、`token`、`execution`、`lt` 等白名单字段。
+- 验证成功后先访问原 `ulogin` 响应地址完成 2FA → OAuth 跳转，未取得认证 Cookie 时再回退到 `authorize`，避免「验证通过但会话未建立」。
+- 按 `errno` 分类提示：4/5 为验证码过期、10002 为 `Invalid request` / 会话失效、1 为未登录，其他错误码原样提示，便于定位。
+- 二次验证弹窗发送后按钮变为「重新发送」，并提示重新发送会使旧验证码失效、验证码有时效。
+- 新增离线测试：2FA 页面账号与隐藏字段提取、提交表单字段、错误码映射；测试不包含真实验证码或凭据。
+
+### 验证
+
+- `cargo test --workspace --locked`：58 项通过，1 项真实网络验证码测试忽略。
+- `cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets --locked -- -D warnings`：通过。
+- 前端构建、Playwright mock 交互检查与真实 Tauri `--ui-smoke-test`：通过。
+- 2026-10-22 用户使用真实账号复测：输入账号密码、接收并填写二次验证码后登录成功。
+
+### 未覆盖
+
+- 运动记录上传仍需要真实账号验收。
+- 真实 2FA 页面字段提取目前由离线夹具与用户复测覆盖；不同学期 / 服务端改版后应重新检查 `account`、隐藏字段与完成地址。
+- 未记录任何账号、密码、验证码、Cookie 或 token；排查时只保留受控错误分类。
+
+## 路线预览地图改为卡片内嵌（2026-10-22）
+
+### 现象
+
+「在地图中打开」原先调用系统浏览器打开本机地图页，预览卡片与地图分离，检查路线需要来回切换窗口。
+
+### 修复
+
+- 新增 `preview_map` 命令：只发布本机地图页并返回 URL，不再调用 `webbrowser::open`；前端把 URL 放进预览卡片的 iframe，再次点击「收起地图」回到 SVG 预览。
+- 预览页固定使用 OpenStreetMap：删除百度脚本、引擎切换器和顶部状态条；地图占满卡片，只在瓦片加载失败时于左下角显示一条错误提示。
+- 地图页仍只监听 `127.0.0.1`，使用随机路径与 `Host` 校验；预览页的 `frame-ancestors` 只放行应用自身（`tauri://localhost`、`http(s)://tauri.localhost`、开发服务器 `http://localhost:1420`），规划器仍为 `'none'`。CSP 拆分为预览与规划器两套：预览页只放行 Leaflet / OSM，规划器保留百度和 `'unsafe-eval'`。
+- 应用 CSP 增加 `frame-src http://127.0.0.1:*`。打开地图成功不再弹顶部提示；只有参数已变更、地图暂用原始路线时才在卡片内显示一句说明。
+- 地图页加载时向父页面发送 `sjturm-map-ready`；`--ui-smoke-test` 用它确认 iframe 内的脚本确实执行，避免只检查 iframe 元素而漏掉 CSP 拒绝嵌入。
+- 切换路线、重新生成预览或参数变动时自动关闭旧地图，避免显示过期轨迹。
+
+### 验证
+
+- `cargo test --workspace --locked`：59 项通过，1 项真实网络验证码测试忽略；新增预览页 OSM-only CSP / 可嵌入、规划器双引擎 CSP / 不可嵌入等测试。
+- `cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets --locked -- -D warnings`：通过。
+- Playwright mock `node e2e/check.mjs`：通过，新增「在地图中打开 → iframe → 收起地图」断言。
+- macOS WKWebView Release `--ui-smoke-test`：`mapButton`、`inlineMap`、`inlineMapReady`、`inlineMapToggle`、`inlineMapCollapsed`、`noMapNotice` 全部为 true；截图确认 OpenStreetMap 底图、轨迹与起终点在卡片内渲染，且没有顶部提示或地图状态条。
+- 使用默认 `default` 路线（0.87 km）在 1200×840 窗口验收。
+
+### 未覆盖
+
+- Windows WebView2 与 Linux WebKitGTK 上 `frame-src` / 自定义协议 `frame-ancestors` 的真机表现；三平台 CSP 语法相同，但未逐平台复测。
+- 深色主题下的地图页观感（底图本身保持浅色），以及 OSM 瓦片失败时左下角错误提示的真实网络表现。
+
+## 预览地图与上传轨迹统一采样口径（2026-10-23）
+
+### 现象
+
+`task.rs` 生成上传轨迹时已按所选单次距离采样、不再加固定 200 m 补偿，但 `preview_map` 的缓存缺失回退分支仍采样 `distance * 1_000.0 + 200.0`，`resample` 的 `target_m > 5_200.0` 上限也只为迁就这条分支而存在。切换 / 导入 / 删除路线都会清空 `preview_inputs`，回退分支必然触发，内嵌地图因此比预览卡片与实际上传轨迹多出 200 m。
+
+### 修复
+
+- `preview_map` 回退分支改为 `distance * 1_000.0`，与 `task.rs` 同一口径；步长仍为固定 10.0 m，保证地图页稳定渲染。
+- 回退分支先校验距离范围，越界直接返回「距离应在 1.20–5.00 km 之间」，不再把无效参数交给采样器。
+- `resample` 上限由 5 200 m 收紧到 5 000 m，即 `settings::MAX_DISTANCE_KM`，采样器不再为补偿留出余量。
+- 回退分支的步长仍为固定 10.0 m：上传侧步长来自随机配速，预览无法也不该复现同一串点，只保证同一口径的总长度。
+
+### 验证
+
+- `cargo fmt --all -- --check`：通过。
+- 新增 `resampling_stops_at_the_configured_distance`：5 000 m 采样成功、5 200 m 被拒。
+
+### 未覆盖
+
+- 本机只有 WebKitGTK 运行库、没有 `libwebkit2gtk-4.1-dev`，`cargo clippy` 与 `cargo test` 需在 CI 或装有开发包的机器上复跑。
+- 真机上切换路线后，预览卡片与内嵌地图显示的长度是否一致（两者应同为所选单次距离）。
+
+## deb 依赖清单只保留一处来源（2026-10-23）
+
+### 现象
+
+`desktop/src-tauri/tauri.conf.json` 的 `bundle.linux.deb.depends` 只列了 2 项，而 CI 从不执行 `tauri build`：真正发布的 deb 由 `scripts/package_desktop.py` 手工打包，`control` 里硬编码了另一份 17 项清单。两份清单互相矛盾，改一处不会反映到另一处。
+
+### 修复
+
+- `tauri.conf.json` 的 `bundle.linux.deb.depends` 补齐为发布清单的完整 17 项，成为唯一来源。
+- `scripts/package_desktop.py` 新增 `deb_depends()`，从该配置读取依赖并写进 `control`，不再硬编码第二份清单；`Recommends` 保留在打包脚本里，因为 Tauri 的 deb 配置没有这一字段。
+
+### 验证
+
+- `python3 -m unittest discover -s scripts -p "test_*.py"`：6 项通过，新增断言 `control` 的 `Depends` 与 `tauri.conf.json` 完全一致；生成的依赖清单与改动前逐项相同、顺序相同。
+
+### 未覆盖
+
+- 未执行 `tauri build` 生成 deb，因此 Tauri 自身追加的依赖与这份清单的并集未实测；当前发布路径仍由打包脚本决定。

@@ -11,7 +11,7 @@ For shared behaviour (parameters, route preview, upload flow, data generation) s
 | macOS | Build deployment target: **11.0**; actual compatibility needs macOS validation |
 | Architecture | One universal build covers both Apple Silicon and Intel |
 
-> The Rust + Slint build no longer depends on PySide6. CI builds Intel and Apple Silicon targets separately and combines them. This migration was implemented on Windows; macOS build, installation, and runtime remain unverified.
+> The Tauri 2 build no longer depends on PySide6. CI builds Intel and Apple Silicon targets separately and combines them, using the system WKWebView; Apple signing and notarization are still separate steps.
 
 ## Install
 

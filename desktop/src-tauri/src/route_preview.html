@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<script>try{parent.postMessage({type:'sjturm-map-ready'},'*')}catch(_){}</script>
+<meta name="viewport" content="width=device-width">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>__TITLE__</title>
+<style>
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:#e7eee8;font:14px system-ui}
+#map{position:absolute;inset:0;background:#e7eee8}
+#empty{display:none;position:absolute;inset:0;z-index:1000;align-items:center;justify-content:center;color:#475467;background:#f8fafc;font-size:16px}
+#map-error{display:none;position:absolute;left:12px;bottom:12px;z-index:1000;max-width:calc(100% - 24px);padding:7px 11px;border-radius:10px;background:#ba1a1a;color:#fff;font-size:12px;line-height:18px;box-shadow:0 2px 8px rgb(0 0 0 / 24%)}
+#map-error.show{display:block}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="empty">暂无可预览路线</div>
+<div id="map-error" role="status" aria-live="polite"></div>
+<script>
+let raw=__POINTS__;
+let updateRoute=null;
+let routeBounds=null;
+window.addEventListener('message',function(event){
+  if(event.source!==parent || event.data?.type!=='sjturm-route-update')return;
+  const points=event.data.points;
+  if(!Array.isArray(points)||points.length>30000||!points.every(p=>Number.isFinite(p.lon)&&Number.isFinite(p.lat)&&Math.abs(p.lon)<=180&&Math.abs(p.lat)<=90))return;
+  raw=points;
+  const bounds=event.data.bounds;
+  if(Array.isArray(bounds)&&bounds.length<=30000&&bounds.length>1&&bounds.every(p=>Number.isFinite(p.lon)&&Number.isFinite(p.lat)&&Math.abs(p.lon)<=180&&Math.abs(p.lat)<=90))routeBounds=bounds;
+  if(updateRoute)updateRoute();
+});
+const PI=3.1415926535897932384626;
+function gcj02ToWgs84(lng,lat){var x=lng-105,y=lat-35;var dlat=-100+2*x+3*y+.2*y*y+.1*x*y+.2*Math.sqrt(Math.abs(x));dlat+=(20*Math.sin(6*x*PI)+20*Math.sin(2*x*PI))*2/3+(20*Math.sin(y*PI)+40*Math.sin(y*PI/3))*2/3+(160*Math.sin(y*PI/12)+320*Math.sin(y*PI/30))*2/3;var dlng=300+x+2*y+.1*x*x+.1*x*y+.1*Math.sqrt(Math.abs(x));dlng+=(20*Math.sin(6*x*PI)+20*Math.sin(2*x*PI))*2/3+(20*Math.sin(x*PI)+40*Math.sin(x*PI/3))*2/3+(150*Math.sin(x*PI/12)+300*Math.sin(x*PI/30))*2/3;var rad=lat/180*PI,magic=1-.006693421622965943*Math.sin(rad)**2;return{lng:lng-dlng*180/(6378245/Math.sqrt(magic)*Math.cos(rad)*PI),lat:lat-dlat*180/((6378245*(1-.006693421622965943))/(magic*Math.sqrt(magic))*PI)}}
+function haversine(a,b){var rad=PI/180,dLat=(b.lat-a.lat)*rad,dLng=(b.lon-a.lon)*rad;var s=Math.sin(dLat/2)**2+Math.cos(a.lat*rad)*Math.cos(b.lat*rad)*Math.sin(dLng/2)**2;return 2*6371000*Math.asin(Math.sqrt(s))}
+function jumps(){var result=[];for(var i=1;i<raw.length;i++){if(haversine(raw[i-1],raw[i])>150)result.push(i);}return result}
+const emptyEl=document.getElementById('empty');
+const errorEl=document.getElementById('map-error');
+if(!raw||raw.length<2)emptyEl.style.display='flex';
+function showError(text){errorEl.textContent=text;errorEl.classList.add('show')}
+function clearError(){errorEl.classList.remove('show')}
+let leafletPromise=null;
+function loadLeaflet(){
+  if(window.L)return Promise.resolve();
+  if(leafletPromise)return leafletPromise;
+  leafletPromise=new Promise(function(resolve,reject){
+    var css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);
+    var script=document.createElement('script');script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload=function(){window.L?resolve():reject(new Error('Leaflet'));};
+    script.onerror=function(){reject(new Error('Leaflet'));};
+    document.head.appendChild(script);
+  }).catch(function(error){leafletPromise=null;throw error;});
+  return leafletPromise;
+}
+function renderOsm(){
+  loadLeaflet().then(function(){
+    if(typeof L==='undefined'){showError('OpenStreetMap 加载失败（网络）');return;}
+    try{
+      var map=L.map('map');
+      var tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19,errorTileUrl:'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect width="256" height="256" fill="%23e7eee8"/%3E%3C/svg%3E'});
+      // Zooming unloads obsolete tiles. Report only a settled viewport with no usable tiles.
+      var tileStates=new Map(),tileNoticeTimer;
+      function assessTiles(){
+        clearTimeout(tileNoticeTimer);
+        tileNoticeTimer=setTimeout(function(){
+          var view=map.getContainer().getBoundingClientRect();
+          var visible=Array.from(tileStates).filter(function(entry){
+            var rect=entry[0].getBoundingClientRect();
+            return entry[0].isConnected&&rect.right>view.left&&rect.left<view.right&&rect.bottom>view.top&&rect.top<view.bottom;
+          });
+          if(visible.length&&visible.every(function(entry){return entry[1]==='failed';}))showError('底图暂时无法加载，请检查网络；轨迹仍可查看');
+          else clearError();
+        },600);
+      }
+      tiles.on('tileloadstart',function(e){tileStates.set(e.tile,'loading');});
+      tiles.on('tileerror',function(e){tileStates.set(e.tile,'failed');assessTiles();});
+      tiles.on('tileload',function(e){if(tileStates.get(e.tile)!=='failed')tileStates.set(e.tile,'loaded');assessTiles();});
+      tiles.on('tileunload',function(e){tileStates.delete(e.tile);assessTiles();});
+      tiles.on('load',assessTiles);
+      map.on('moveend zoomend',assessTiles);
+      tiles.addTo(map);
+      var line=L.polyline([],{color:'#168c6c',weight:4}).addTo(map);
+      var jumpLayer=L.layerGroup().addTo(map);
+      var start=null,end=null,fitted=false, fittedRoute=false;
+      updateRoute=function(){
+        var pts=raw.map(function(p){var w=gcj02ToWgs84(p.lon,p.lat);return [w.lat,w.lng];});
+        emptyEl.style.display=pts.length<2?'flex':'none';
+        line.setLatLngs(pts);
+        jumpLayer.clearLayers();
+        if(pts.length<2)return;
+        if(!fitted || (routeBounds&&!fittedRoute)){
+          var bounds=routeBounds?routeBounds.map(function(p){var w=gcj02ToWgs84(p.lon,p.lat);return [w.lat,w.lng];}):pts;
+          // Fit precisely, then restore normal wheel, trackpad and button zoom steps.
+          var zoomSnap=map.options.zoomSnap;
+          try{map.options.zoomSnap=0;map.fitBounds(bounds,{padding:[38,38],animate:false});}
+          finally{map.options.zoomSnap=zoomSnap;}
+          fitted=true;fittedRoute=!!routeBounds;
+        }
+        jumps().forEach(function(i){L.polyline([pts[i-1],pts[i]],{color:'#dc5a4f',weight:6}).addTo(jumpLayer);});
+        if(!start){
+          start=L.circleMarker(pts[0],{color:'#168c6c',radius:7,fillOpacity:1}).addTo(map).bindPopup('起点');
+          end=L.circleMarker(pts[pts.length-1],{color:'#dc5a4f',radius:6,fillOpacity:1}).addTo(map).bindPopup('终点');
+        }
+        start.setLatLng(pts[0]);end.setLatLng(pts[pts.length-1]);
+      };
+      updateRoute();
+    }catch(_){showError('OpenStreetMap 初始化失败');}
+  },function(){showError('OpenStreetMap 加载失败（网络）');});
+}
+renderOsm();
+</script>
+</body></html>

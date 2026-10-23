@@ -38,8 +38,8 @@
 
 ```
 SJTURunningMan_Advanced_Edition/
-├── desktop/                Rust + Slint 电脑版（src/ 与 ui/）
-├── Cargo.toml              桌面 Cargo workspace（版本号在 desktop/Cargo.toml）
+├── desktop/                Tauri 2 电脑版（React 19 前端 + src-tauri/ Rust 后端）
+├── Cargo.toml              桌面 Cargo workspace（版本号在 desktop/src-tauri/Cargo.toml）
 ├── assets/                 图标、内置路线（assets/Routes/）
 ├── build_windows.ps1       Windows 打包脚本
 ├── route_planner.html      电脑版路线规划器（默认百度，可切 OpenStreetMap）

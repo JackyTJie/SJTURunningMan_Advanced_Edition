@@ -18,7 +18,11 @@ This project stands on the work of its predecessors and many helpful contributor
 
 ## Dependencies and assets
 
-- [Rust](https://www.rust-lang.org/) + [Slint](https://slint.dev/) — desktop UI and runtime
+- [Rust](https://www.rust-lang.org/) + [Tauri 2](https://tauri.app/) — desktop backend, windowing and packaging
+- [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) + [@material/web](https://github.com/material-components/material-web) — Material Design 3 desktop UI
+- [material / md3.io](https://md3.io/) — desktop end-date picker and distance slider (third-party MD3 component, MIT)
+- [Material Components Android](https://github.com/material-components/material-components-android) — official drawing source for the wavy semester progress indicator (Apache 2.0); [desktop port notes](../../desktop/third_party/material-progress/README.md)
+- [Roboto](https://fonts.google.com/specimen/Roboto) + [Material Symbols](https://fonts.google.com/icons) — UI fonts and icons (Apache 2.0, bundled as used subsets)
 - [PySide6 / Qt](https://www.qt.io/) — legacy desktop UI (v4.4.x and earlier, retired)
 - [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) — desktop route planner base map
 - [Baidu Maps](https://lbsyun.baidu.com/) — mobile route design base map

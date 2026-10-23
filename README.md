@@ -5,8 +5,10 @@
   <p><strong>轻量 · 实际路线预览 · 记录生成与上传流程研究</strong></p>
 
   <p>
-    <img alt="Rust" src="https://img.shields.io/badge/Rust-native-222222?logo=rust&amp;logoColor=white" />
-    <img alt="Slint" src="https://img.shields.io/badge/Slint-native%20UI-236849" />
+    <img alt="Rust" src="https://img.shields.io/badge/Rust-backend-222222?logo=rust&amp;logoColor=white" />
+    <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&amp;logoColor=white" />
+    <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&amp;logoColor=black" />
+    <img alt="Material Design 3" src="https://img.shields.io/badge/Material%20Design-3-6750A4?logo=materialdesign&amp;logoColor=white" />
     <img alt="Desktop" src="https://img.shields.io/badge/Desktop-v4.5.0-0078D4?logo=windows&amp;logoColor=white" />
     <img alt="Android" src="https://img.shields.io/badge/Android-v4.5.0-3DDC84?logo=android&amp;logoColor=white" />
     <img alt="iOS" src="https://img.shields.io/badge/iOS-v4.5.0-000000?logo=apple&amp;logoColor=white" />
@@ -34,12 +36,12 @@
 
 本项目仅用于学习、研究和技术测试，主要用于理解运动数据记录与上传相关的技术流程。项目作者不鼓励、不支持任何违反学校规定的使用方式。请在使用前确认自己的行为符合 SJTU 及相关平台的要求，请不要用于伪造运动数据或规避体育锻炼要求。
 
-电脑版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。新版使用 Rust + Slint，运行时无需 Python、Qt 或 WebView。程序默认以昨日作为结束日期，向前生成指定次数的跑步记录（默认 1 次），每次跑步 4 km，时间为 `08:00:00`。
+电脑版提供跑步次数、时间、距离和路线等参数配置，便于进行流程研究、规则测试和结果复核。新版使用 **Tauri 2 + React 19 + TypeScript + Rust**，界面主要使用 Google 官方 `@material/web` 组件，结束日期和距离滑块使用 md3.io 的 `material` 组件，遵循 Material Design 3；运行时使用系统 WebView，不携带 Chromium、Qt 或 Python。程序默认以昨日作为结束日期，向前生成指定次数的跑步记录（默认 1 次），每次跑步 4 km，时间为 `08:00:00`。
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/desktop-native-dark.webp" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/desktop-native-light.webp" />
-  <img alt="Windows 主界面预览" src="docs/images/desktop-native-light.webp" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/desktop-tauri-dark.webp" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/desktop-tauri-light.webp" />
+  <img alt="电脑版主界面预览" src="docs/images/desktop-tauri-light.webp" />
 </picture>
 
 ## 平台与文档
@@ -60,7 +62,7 @@
 
 | 模块 | 当前状态 |
 | --- | --- |
-| 电脑版图形界面 | Rust + Slint 原生桌面版，版本 `v4.5.0`，深浅色主题 + 离线轨迹预览 |
+| 电脑版图形界面 | Tauri 2 + React 19 + Material Design 3，版本 `v4.5.0`，深浅色主题 + 离线轨迹预览 |
 | 路线预览 | 上传前离线预览（免登录）+ 上传中/后显示实际 payload 轨迹，>150 m 跳段红色高亮 |
 | 路线规划器 | 电脑版百度地图（默认）/ OpenStreetMap 可切换；移动端百度地图 |
 | 路线选择 | 内置 `default.txt`，支持外部 txt 导入与持久化 |
@@ -77,15 +79,16 @@
 
 ## 从源码运行
 
-电脑版是 Rust + Slint 原生程序，克隆仓库后一条命令即可运行，不需要安装包，也不需要 Python 或 Qt：
+电脑版使用 Tauri 2，克隆仓库后先装前端依赖，再启动开发窗口：
 
 ```bash
 git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
 cd SJTURunningMan_Advanced_Edition
-cargo run --locked -p sjturunningman
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop tauri dev
 ```
 
-需要 Rust 1.95+（用 `rustup` 安装 stable）和本机的 C/C++ 链接工具链；Linux 还要装 `pkg-config`、`libfontconfig1-dev`、`libxkbcommon-dev` 等依赖。各平台的完整步骤、测试与打包命令见 [docs/build.md](docs/build.md)。
+需要 Rust 1.95+、Node.js 22+、pnpm 11+ 和对应平台的 Tauri 系统依赖；Linux 还要装 `libwebkit2gtk-4.1-dev`、`libgtk-3-dev` 等。生产构建用 `cargo build --release --locked -p sjturunningman --features custom-protocol`，或 `pnpm --dir desktop tauri build`。各平台的完整步骤、测试与打包命令见 [docs/build.md](docs/build.md)。
 
 ## 文档导航
 

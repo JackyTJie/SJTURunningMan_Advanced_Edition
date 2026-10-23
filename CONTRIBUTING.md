@@ -6,7 +6,7 @@
 
 | 平台 | 目录 | 语言 / 框架 |
 | --- | --- | --- |
-| 电脑版 | `desktop/`（根 Cargo workspace） | Rust + Slint |
+| 电脑版 | `desktop/` 前端 + `desktop/src-tauri/`（根 Cargo workspace） | Tauri 2 + React 19 + TypeScript + Rust |
 | 安卓 | `apps/android/` | Kotlin + Jetpack Compose |
 | iOS | `apps/ios/` | Swift + SwiftUI |
 | 鸿蒙 | `apps/harmonyos/` | ArkTS |
@@ -20,7 +20,9 @@
 ### 电脑版
 
 ```bash
-cargo run --locked -p sjturunningman
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop tauri dev
+pnpm --dir desktop build
 cargo test --workspace --locked
 ```
 
@@ -54,7 +56,7 @@ DevEco Studio，签名与 HAP 构建见 [docs/build.md](docs/build.md#鸿蒙)。
 ## 提交前自检
 
 - [ ] 改动只涉及一个平台（跨平台改动请在 PR 说明里讲清理由）；
-- [ ] 电脑版按 [docs/testing.md](docs/testing.md#电脑版手动验收清单) 过一遍手动清单；
+- [ ] 电脑版按 [docs/testing.md](docs/testing.md#电脑版) 过一遍手动清单；
 - [ ] 安卓改了逻辑 → 跑 `cd apps/android && ./gradlew test`；
 - [ ] 没有把构建产物、`local.properties`、IDE 配置、`.DS_Store` 带进提交；
 - [ ] 没有提交任何凭据：Cookie、密码、验证码、keystore、`.env`；
@@ -72,12 +74,12 @@ DevEco Studio，签名与 HAP 构建见 [docs/build.md](docs/build.md#鸿蒙)。
 
 | 平台 | 文件 | 字段 |
 | --- | --- | --- |
-| 电脑版 | `desktop/Cargo.toml` | `package.version` |
+| 电脑版 | `desktop/src-tauri/Cargo.toml` | `package.version` |
 | 安卓 | `apps/android/app/build.gradle.kts` | `versionName` / `versionCode` |
 | iOS | `apps/ios/SJTURunningMan.xcodeproj/project.pbxproj` | `MARKETING_VERSION` |
 | 鸿蒙 | `apps/harmonyos/AppScope/app.json5` | `versionName` / `versionCode` |
 
-发版由维护者打 `v*` tag 触发 `release.yml`；tag 必须与 `desktop/Cargo.toml` 的 `version` 一致，工作流会断言，不一致直接失败。**不要**在功能 PR 里顺手改版本号。
+发版由维护者打 `v*` tag 触发 `release.yml`；tag 必须与 `desktop/src-tauri/Cargo.toml` 的 `version` 一致，工作流会断言，不一致直接失败。**不要**在功能 PR 里顺手改版本号。
 
 ## 不要提交的东西
 

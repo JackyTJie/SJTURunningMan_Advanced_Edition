@@ -1,11 +1,12 @@
 """验证打包布局，系统打包命令通过 mock 隔离。"""
+import json
 import plistlib
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from package_desktop import cargo_version, package
+from package_desktop import ROOT, TAURI_CONFIG, cargo_version, deb_depends, package
 
 
 class PackagingTest(unittest.TestCase):
@@ -25,11 +26,22 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("Architecture: arm64", control)
         self.assertIn("Version: 4.5.0~rc.1", control)
         self.assertIn("libc6 (>= 2.39)", control)
+        self.assertIn("libwebkit2gtk-4.1-0", control)
+        self.assertIn(f"Depends: {', '.join(deb_depends())}\n", control)
         self.assertEqual((stage / "usr/bin/sjturunningman").read_bytes(), self.binary.read_bytes())
         self.assertIn("Exec=sjturunningman", (stage / "usr/share/applications/sjturunningman.desktop").read_text())
         self.assertEqual(run.call_args.args[0][0], "dpkg-deb")
         with self.assertRaises(FileExistsError):
             package("linux", self.binary, output, "4.5.0", "arm64")
+
+    def test_deb_depends_come_from_the_tauri_config(self):
+        depends = deb_depends()
+        config = json.loads(TAURI_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(depends, config["bundle"]["linux"]["deb"]["depends"])
+        self.assertIn("libwebkit2gtk-4.1-0", depends)
+        self.assertIn("libgtk-3-0", depends)
+        control = (ROOT / "scripts/package_desktop.py").read_text(encoding="utf-8")
+        self.assertNotIn("libxkbcommon-x11-0", control)
 
     @patch("pathlib.Path.symlink_to")
     @patch("package_desktop.subprocess.run")

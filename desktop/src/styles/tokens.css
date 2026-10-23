@@ -1,0 +1,274 @@
+/*
+ * SJTU RunningMan — Material Design 3 design tokens.
+ * 由 scripts/generate-theme.mjs 从 seed #335C9C 生成，请勿手改颜色值。
+ */
+:root {
+  color-scheme: light;
+  --md-sys-color-primary: #2b5ea7;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d7e3ff;
+  --md-sys-color-on-primary-container: #001b3e;
+  --md-sys-color-secondary: #565e71;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #dae2f9;
+  --md-sys-color-on-secondary-container: #131c2b;
+  --md-sys-color-tertiary: #705574;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #fad8fd;
+  --md-sys-color-on-tertiary-container: #28132e;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+  --md-sys-color-surface: #fdfbff;
+  --md-sys-color-on-surface: #1a1b1f;
+  --md-sys-color-surface-variant: #e0e2ec;
+  --md-sys-color-on-surface-variant: #44474e;
+  --md-sys-color-outline: #74777f;
+  --md-sys-color-outline-variant: #c4c6d0;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-inverse-surface: #2f3033;
+  --md-sys-color-inverse-on-surface: #f1f0f4;
+  --md-sys-color-inverse-primary: #aac7ff;
+  --md-sys-color-surface-dim: #dbd9dd;
+  --md-sys-color-surface-bright: #faf9fd;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f4f3f7;
+  --md-sys-color-surface-container: #efedf1;
+  --md-sys-color-surface-container-high: #e9e7ec;
+  --md-sys-color-surface-container-highest: #e3e2e6;
+  --md-sys-color-surface-tint: #2b5ea7;
+  --md-sys-color-primary-fixed: #d7e3ff;
+  --md-sys-color-primary-fixed-dim: #aac7ff;
+  --md-sys-color-on-primary-fixed: #001b3e;
+  --md-sys-color-on-primary-fixed-variant: #01458e;
+  --md-sys-color-secondary-fixed: #dae2f9;
+  --md-sys-color-secondary-fixed-dim: #bec6dc;
+  --md-sys-color-on-secondary-fixed: #131c2b;
+  --md-sys-color-on-secondary-fixed-variant: #3e4759;
+  --md-sys-color-tertiary-fixed: #fad8fd;
+  --md-sys-color-tertiary-fixed-dim: #ddbce0;
+  --md-sys-color-on-tertiary-fixed: #28132e;
+  --md-sys-color-on-tertiary-fixed-variant: #573e5c;
+  --md-sys-color-error-fixed: #ffdad6;
+  --md-sys-color-error-fixed-dim: #ffb4ab;
+  --md-sys-color-on-error-fixed: #410002;
+  --md-sys-color-on-error-fixed-variant: #93000a;
+
+  /* 排版：MD3 type scale（Roboto + 系统 CJK 回退） */
+  --md-ref-typeface-plain: 'Roboto', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --app-font-mono: 'SF Mono', 'Cascadia Mono', 'Consolas', 'Roboto Mono', monospace;
+
+  --md-sys-typescale-display-large-size: 3.5625rem;
+  --md-sys-typescale-display-large-line-height: 4rem;
+  --md-sys-typescale-display-large-weight: 400;
+  --md-sys-typescale-display-large-tracking: -0.015625rem;
+  --md-sys-typescale-display-medium-size: 2.8125rem;
+  --md-sys-typescale-display-medium-line-height: 3.25rem;
+  --md-sys-typescale-display-medium-weight: 400;
+  --md-sys-typescale-display-medium-tracking: 0;
+  --md-sys-typescale-display-small-size: 2.25rem;
+  --md-sys-typescale-display-small-line-height: 2.75rem;
+  --md-sys-typescale-display-small-weight: 400;
+  --md-sys-typescale-display-small-tracking: 0;
+  --md-sys-typescale-headline-large-size: 2rem;
+  --md-sys-typescale-headline-large-line-height: 2.5rem;
+  --md-sys-typescale-headline-large-weight: 400;
+  --md-sys-typescale-headline-large-tracking: 0;
+  --md-sys-typescale-headline-medium-size: 1.75rem;
+  --md-sys-typescale-headline-medium-line-height: 2.25rem;
+  --md-sys-typescale-headline-medium-weight: 400;
+  --md-sys-typescale-headline-medium-tracking: 0;
+  --md-sys-typescale-headline-small-size: 1.5rem;
+  --md-sys-typescale-headline-small-line-height: 2rem;
+  --md-sys-typescale-headline-small-weight: 400;
+  --md-sys-typescale-headline-small-tracking: 0;
+  --md-sys-typescale-title-large-size: 1.375rem;
+  --md-sys-typescale-title-large-line-height: 1.75rem;
+  --md-sys-typescale-title-large-weight: 500;
+  --md-sys-typescale-title-large-tracking: 0;
+  --md-sys-typescale-title-medium-size: 1rem;
+  --md-sys-typescale-title-medium-line-height: 1.5rem;
+  --md-sys-typescale-title-medium-weight: 500;
+  --md-sys-typescale-title-medium-tracking: 0.009375rem;
+  --md-sys-typescale-title-small-size: 0.875rem;
+  --md-sys-typescale-title-small-line-height: 1.25rem;
+  --md-sys-typescale-title-small-weight: 500;
+  --md-sys-typescale-title-small-tracking: 0.00625rem;
+  --md-sys-typescale-body-large-size: 1rem;
+  --md-sys-typescale-body-large-line-height: 1.5rem;
+  --md-sys-typescale-body-large-weight: 400;
+  --md-sys-typescale-body-large-tracking: 0.03125rem;
+  --md-sys-typescale-body-medium-size: 0.875rem;
+  --md-sys-typescale-body-medium-line-height: 1.25rem;
+  --md-sys-typescale-body-medium-weight: 400;
+  --md-sys-typescale-body-medium-tracking: 0.015625rem;
+  --md-sys-typescale-body-small-size: 0.75rem;
+  --md-sys-typescale-body-small-line-height: 1rem;
+  --md-sys-typescale-body-small-weight: 400;
+  --md-sys-typescale-body-small-tracking: 0.025rem;
+  --md-sys-typescale-label-large-size: 0.875rem;
+  --md-sys-typescale-label-large-line-height: 1.25rem;
+  --md-sys-typescale-label-large-weight: 500;
+  --md-sys-typescale-label-large-tracking: 0.00625rem;
+  --md-sys-typescale-label-medium-size: 0.75rem;
+  --md-sys-typescale-label-medium-line-height: 1rem;
+  --md-sys-typescale-label-medium-weight: 500;
+  --md-sys-typescale-label-medium-tracking: 0.03125rem;
+  --md-sys-typescale-label-small-size: 0.6875rem;
+  --md-sys-typescale-label-small-line-height: 1rem;
+  --md-sys-typescale-label-small-weight: 500;
+  --md-sys-typescale-label-small-tracking: 0.03125rem;
+
+  /* 形状 */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* 层级 */
+  --md-sys-elevation-shadow-color: var(--md-sys-color-shadow);
+  --app-elevation-0: none;
+  --app-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --app-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --app-elevation-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+
+  /* 状态层与动效 */
+  --md-sys-state-hover-state-layer-opacity: 0.08;
+  --md-sys-state-focus-state-layer-opacity: 0.1;
+  --md-sys-state-pressed-state-layer-opacity: 0.1;
+  --md-sys-state-dragged-state-layer-opacity: 0.16;
+  --app-motion-standard: cubic-bezier(0.2, 0, 0, 1);
+  --app-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --app-motion-duration-short: 150ms;
+  --app-motion-duration-medium: 250ms;
+  --app-motion-duration-long: 400ms;
+  /* Match md3.io's time picker entrance for the date dialog. */
+  --app-picker-enter-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --app-picker-enter-transform: translateY(20px) scale(0.9);
+
+  /* Material Components Android progress tokens; dp mapped to CSS px. */
+  --app-semester-progress-thickness: 4px;
+  --app-semester-progress-amplitude: 3px;
+  --app-semester-progress-wavelength: 40px;
+  /* Explicit nonzero waveSpeed: one 40px wave per second. Upstream default is 0. */
+  --app-semester-progress-speed: 40;
+  --app-semester-progress-gap: 4px;
+  --app-semester-progress-stop-size: 4px;
+  --app-semester-progress-active-color: var(--md-sys-color-primary);
+  --app-semester-progress-track-color: var(--md-sys-color-secondary-container);
+
+  /* Task completion celebration: shared palette and particle motion. */
+  --app-confetti-colors: #2979ff, #a142f4, #ffca28, #00c853, #ff4081;
+  --app-confetti-particles-per-side: 90;
+  --app-confetti-scalar: 1.4;
+  --app-confetti-emoji-per-side: 8;
+  --app-confetti-emoji-scalar: 2.8;
+  --app-confetti-spread: 65;
+  --app-confetti-velocity: 48;
+  --app-confetti-gravity: 1;
+  --app-confetti-ticks: 180;
+  --app-confetti-layer: 100;
+
+  /* 图标字体 */
+  --md-icon-font: 'Material Symbols Rounded';
+  --app-sidebar-width: 248px;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --md-sys-color-primary: #aac7ff;
+  --md-sys-color-on-primary: #002f65;
+  --md-sys-color-primary-container: #01458e;
+  --md-sys-color-on-primary-container: #d7e3ff;
+  --md-sys-color-secondary: #bec6dc;
+  --md-sys-color-on-secondary: #283141;
+  --md-sys-color-secondary-container: #3e4759;
+  --md-sys-color-on-secondary-container: #dae2f9;
+  --md-sys-color-tertiary: #ddbce0;
+  --md-sys-color-on-tertiary: #3f2844;
+  --md-sys-color-tertiary-container: #573e5c;
+  --md-sys-color-on-tertiary-container: #fad8fd;
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+  --md-sys-color-on-error-container: #ffb4ab;
+  --md-sys-color-surface: #1a1b1f;
+  --md-sys-color-on-surface: #e3e2e6;
+  --md-sys-color-surface-variant: #44474e;
+  --md-sys-color-on-surface-variant: #c4c6d0;
+  --md-sys-color-outline: #8e9099;
+  --md-sys-color-outline-variant: #44474e;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-inverse-surface: #e3e2e6;
+  --md-sys-color-inverse-on-surface: #2f3033;
+  --md-sys-color-inverse-primary: #2b5ea7;
+  --md-sys-color-surface-dim: #121316;
+  --md-sys-color-surface-bright: #38393c;
+  --md-sys-color-surface-container-lowest: #0d0e11;
+  --md-sys-color-surface-container-low: #1a1b1f;
+  --md-sys-color-surface-container: #1f1f23;
+  --md-sys-color-surface-container-high: #292a2d;
+  --md-sys-color-surface-container-highest: #343538;
+  --md-sys-color-surface-tint: #aac7ff;
+  --md-sys-color-primary-fixed: #d7e3ff;
+  --md-sys-color-primary-fixed-dim: #aac7ff;
+  --md-sys-color-on-primary-fixed: #001b3e;
+  --md-sys-color-on-primary-fixed-variant: #01458e;
+  --md-sys-color-secondary-fixed: #dae2f9;
+  --md-sys-color-secondary-fixed-dim: #bec6dc;
+  --md-sys-color-on-secondary-fixed: #131c2b;
+  --md-sys-color-on-secondary-fixed-variant: #3e4759;
+  --md-sys-color-tertiary-fixed: #fad8fd;
+  --md-sys-color-tertiary-fixed-dim: #ddbce0;
+  --md-sys-color-on-tertiary-fixed: #28132e;
+  --md-sys-color-on-tertiary-fixed-variant: #573e5c;
+  --md-sys-color-error-fixed: #ffdad6;
+  --md-sys-color-error-fixed-dim: #ffb4ab;
+  --md-sys-color-on-error-fixed: #410002;
+  --md-sys-color-on-error-fixed-variant: #93000a;
+}
+
+/* md3.io date picker, time picker and distance slider: reuse project tokens. */
+.md3-date-field,
+.time-picker,
+.distance-field {
+  --mtrl-sys-color-primary: var(--md-sys-color-primary);
+  --mtrl-sys-color-on-primary: var(--md-sys-color-on-primary);
+  --mtrl-sys-color-primary-container: var(--md-sys-color-primary-container);
+  --mtrl-sys-color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --mtrl-sys-color-secondary: var(--md-sys-color-secondary);
+  --mtrl-sys-color-on-secondary: var(--md-sys-color-on-secondary);
+  --mtrl-sys-color-secondary-container: var(--md-sys-color-secondary-container);
+  --mtrl-sys-color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --mtrl-sys-color-tertiary-container: var(--md-sys-color-tertiary-container);
+  --mtrl-sys-color-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+  --mtrl-sys-color-surface: var(--md-sys-color-surface);
+  --mtrl-sys-color-on-surface: var(--md-sys-color-on-surface);
+  --mtrl-sys-color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --mtrl-sys-color-surface-container-high: var(--md-sys-color-surface-container-high);
+  --mtrl-sys-color-surface-container-highest: var(--md-sys-color-surface-container-highest);
+  --mtrl-sys-color-outline: var(--md-sys-color-outline);
+  --mtrl-sys-color-outline-variant: var(--md-sys-color-outline-variant);
+  --mtrl-sys-color-error: var(--md-sys-color-error);
+  --mtrl-sys-color-scrim: var(--md-sys-color-scrim);
+  --mtrl-ref-typeface-plain: var(--md-ref-typeface-plain);
+  --mtrl-ref-typeface-brand: var(--md-ref-typeface-brand);
+  --mtrl-sys-shape-corner-extra-large: var(--md-sys-shape-corner-extra-large);
+  --mtrl-sys-shape-corner-full: var(--md-sys-shape-corner-full);
+}
+
+/* 时间选择器的 ::backdrop 在 top layer，拿不到对话框元素上继承的变量。 */
+:root {
+  --mtrl-sys-color-scrim: var(--md-sys-color-scrim);
+}
+
+:root {
+  --motion-route-response: 45ms;
+}

@@ -38,8 +38,8 @@ This directory is the English mirror of the project documentation. The root [REA
 
 ```
 SJTURunningMan_Advanced_Edition/
-├── desktop/                Rust + Slint desktop (src/ and ui/)
-├── Cargo.toml              Desktop Cargo workspace (version lives in desktop/Cargo.toml)
+├── desktop/                Tauri 2 desktop (React 19 frontend + src-tauri/ Rust backend)
+├── Cargo.toml              Desktop Cargo workspace (version lives in desktop/src-tauri/Cargo.toml)
 ├── assets/                 Icons and built-in routes (assets/Routes/)
 ├── build_windows.ps1       Windows packaging script
 ├── route_planner.html      Desktop route planner (Baidu by default, OpenStreetMap optional)

@@ -4,7 +4,7 @@
 
 | 平台 | 目录 | 工具链 | 产物 |
 | --- | --- | --- | --- |
-| 电脑版 | 仓库根 | Rust + Slint / Cargo | `.exe` / `.dmg` / `.deb` |
+| 电脑版 | 仓库根 + `desktop/` | Rust 1.95+ / Tauri 2 / pnpm + Node 22+ | `.exe` / `.dmg` / `.deb` |
 | 安卓 | `apps/android/` | Gradle 9.4.1 + AGP 8.13.0 + Kotlin 2.2.10 | `.apk` / `.aab` |
 | iOS | `apps/ios/` | Xcode 16+ | `.ipa` |
 | 鸿蒙 | `apps/harmonyos/` | DevEco Studio / hvigor | `.hap` |
@@ -20,28 +20,36 @@
 ```bash
 git clone https://github.com/JackyTJie/SJTURunningMan_Advanced_Edition.git
 cd SJTURunningMan_Advanced_Edition
-cargo run --locked -p sjturunningman
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop tauri dev
 ```
 
-需要 Rust 1.95+（用 `rustup` 安装 stable 即可）和本机的 C/C++ 链接工具链；运行电脑版不需要 Python、Qt 或 WebView。各系统的额外依赖见下一节。首次启动仍需阅读并勾选使用承诺书。
+需要 Rust 1.95+、Node.js 22+、pnpm 11+，以及对应平台的 Tauri 系统依赖。电脑版使用操作系统 WebView（Windows WebView2 / macOS WKWebView / Linux WebKitGTK），不携带 Chromium、Qt 或 Python。首次启动仍需阅读并勾选使用承诺书。
 
-### 原生桌面构建
+> `pnpm tauri dev` 会同时启动 Vite（端口 1420）与 Tauri 窗口。直接 `cargo run` 属于 Tauri 开发模式，会连接这个 dev server；单独运行它不会加载前端。生产构建请带 `custom-protocol` feature。
+
+### 前端与原生构建
 
 ```bash
 # 使用当前 stable Rust；Cargo.lock 固定全部依赖
-cargo run --locked -p sjturunningman
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop build            # tsc --noEmit + vite build
 cargo test --workspace --locked
-cargo build --release --locked
+cargo build --release --locked -p sjturunningman --features custom-protocol
+
+# 或让 Tauri CLI 一次完成前端与打包
+pnpm --dir desktop tauri build
 ```
 
-Windows：安装 Rust 1.95+，并准备 MSVC Build Tools 或 MinGW-w64 工具链。运行 `./build_windows.ps1` → `dist/SJTURunningMan.exe`。`.cargo/config.toml` 为 MSVC 配置静态 CRT；本轮实际验证的是 GNU 工具链。
+Windows：安装 Rust 1.95+、Node 22+、pnpm 11+，并准备 MSVC Build Tools 或 MinGW-w64 工具链。运行 `./build_windows.ps1`（会先构建前端）→ `dist/SJTURunningMan.exe`。`.cargo/config.toml` 为 MSVC 配置静态 CRT；本轮实际验证的是 GNU 工具链。用户机器需要 WebView2 Runtime（Windows 10/11 通常已预装）。
 
 macOS（需安装 Xcode Command Line Tools）：
 
 ```bash
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
-MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target x86_64-apple-darwin
-MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --target aarch64-apple-darwin
+pnpm --dir desktop build
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target x86_64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target aarch64-apple-darwin
 mkdir -p dist
 lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
 python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
@@ -50,19 +58,22 @@ python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 Linux（Ubuntu 24.04，支持 X11 / Wayland）：
 
 ```bash
-sudo apt-get install build-essential pkg-config libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
-cargo build --release --locked
+sudo apt-get install build-essential pkg-config libssl-dev libxdo-dev \
+  libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+  libayatana-appindicator3-dev libsoup-3.0-dev
+pnpm --dir desktop build
+cargo build --release --locked --features custom-protocol
 python3 scripts/package_desktop.py linux --binary target/release/sjturunningman --arch amd64
 # ARM64: build on an ARM64 host and use --arch arm64.
 ```
 
-`APP_VERSION` 可覆盖显示版本，否则 `desktop/build.rs` 取 `desktop/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 使用软件渲染和内嵌资源，不打包 Qt / Python / WebView。旧 Python 模块、`requirements.txt` 与 PyInstaller 配置已全部移除，仓库里只剩 `scripts/` 下的打包脚本用到 Python。
+`APP_VERSION` 可覆盖显示版本，否则 `desktop/src-tauri/build.rs` 取 `desktop/src-tauri/Cargo.toml` 的 `package.version`；发 tag 时 `release.yml` 会断言两者一致。Python 仅运行构建机的打包脚本，不随应用分发。Release 把前端资源与字体子集嵌入二进制，不打包 Chromium / Qt / Python；Linux 运行时应使用系统 WebKitGTK。旧 Python 模块、`requirements.txt` 与 PyInstaller 配置已全部移除，仓库里只剩 `scripts/` 下的打包脚本用到 Python。
 
 ### 桌面检查与发布构建
 
-`Native desktop checks`（`.github/workflows/desktop-check.yml`）在桌面代码 push / PR 时运行，也支持 Actions 页的 **Run workflow**。它只在 Ubuntu 上执行 `cargo fmt`、`cargo clippy`、`cargo test` 和打包布局测试，不构建任何安装包，通常几分钟内结束。
+`Native desktop checks`（`.github/workflows/desktop-check.yml`）在桌面代码 push / PR 时运行，也支持 Actions 页的 **Run workflow**。它在 Ubuntu 上先安装前端依赖并执行 `tsc --noEmit` + Vite 构建，再跑 `cargo fmt`、`cargo clippy`、`cargo test` 和打包布局测试，不构建任何安装包，通常几分钟内结束。
 
-Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb 的构建、打包验证与上传由 [`.github/workflows/release.yml`](../.github/workflows/release.yml) 在推送 tag 或手动发布时完成；PC 三平台 smoke 验证也在该流程中执行。macOS 为 ad-hoc 签名，不包含 Apple Developer ID 或公证。
+Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb 的构建、打包验证与上传由 [`.github/workflows/release.yml`](../.github/workflows/release.yml) 在推送 tag 或手动发布时完成。macOS 为 ad-hoc 签名，不包含 Apple Developer ID 或公证。真实 WebView 的 `--ui-smoke-test` 需要图形会话，默认在本地执行，不放进发布流水线。
 
 ### 自动发布流水线
 
@@ -77,7 +88,7 @@ Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb 的构建、打包�
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest（自签名） |
 | `SHA256SUMS.txt` | release 作业汇总生成 |
 
-桌面使用 stable Rust（当前锁定依赖要求 Rust 1.95+）和 Cargo.lock。两个 deb 构建在 Ubuntu 24.04 上，声明 glibc ≥ 2.39。macOS 通过 lipo 合并两套 Rust 目标；Windows 内嵌现有图标。应用运行不需要 Python。
+桌面使用 stable Rust（当前锁定依赖要求 Rust 1.95+）、Node 22+、pnpm 11+ 和 Cargo.lock。两个 deb 构建在 Ubuntu 24.04 上，声明 glibc ≥ 2.39，并依赖 WebKitGTK 4.1 / GTK 3。macOS 通过 lipo 合并两套 Rust 目标；Windows 内嵌现有图标。应用运行不需要 Python。
 
 > **iOS 与鸿蒙 NEXT 不在这个流水线里**，Releases 也不提供它们的预编译包，目前都只手工构建：
 >

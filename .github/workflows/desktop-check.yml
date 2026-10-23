@@ -5,9 +5,9 @@ on:
     # tag push 会把整棵树算作变更，paths 过滤拦不住它；发版 tag 与归档 tag
     # 都由 release.yml 负责，这里不重复跑一遍桌面检查。
     tags-ignore: '*'
-    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/**', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml']
+    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/**', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml', '.github/workflows/release.yml']
   pull_request:
-    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/**', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml']
+    paths: ['.cargo/**', 'desktop/**', 'Cargo.toml', 'Cargo.lock', 'assets/**', 'route_planner.html', 'build_windows.ps1', 'scripts/package_desktop.py', 'scripts/test_*.py', '.github/workflows/desktop-check.yml', '.github/workflows/release.yml']
 concurrency:
   group: desktop-${{ github.ref }}
   cancel-in-progress: true
@@ -15,20 +15,87 @@ permissions:
   contents: read
 jobs:
   checks:
-    # PR / push 只做静态检查和单元测试。安装包构建、三平台打包与 smoke
-    # 验证统一放在 release.yml，由 tag 或手动发布触发，避免每次提交等十几分钟。
+    # PR / push 只做前端构建、静态检查和单元测试。安装包构建与三平台打包
+    # 统一放在 release.yml，由 tag 或手动发布触发，避免每次提交等十几分钟。
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
       - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file libxdo-dev libssl-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
+            libsoup-3.0-dev
+      - name: Install frontend dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+      - name: Build frontend and typecheck
+        run: pnpm --dir desktop build
       - name: Test packaging layouts
         run: python3 -m unittest discover -s scripts -p "test_*.py"
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+
+  browser-checks:
+    name: Desktop browser interactions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run mocked IPC interaction checks
+        shell: bash
+        run: |
+          pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/desktop-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:4173/ > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/desktop-preview.log"
+            exit 1
+          fi
+          for check in check login celebration preview-fixes slider-drag live-route; do
+            node "e2e/$check.mjs"
+          done
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-browser-diagnostics
+          path: |
+            ${{ runner.temp }}/desktop-preview.log
+            /tmp/sjturunningman-*.png
+          if-no-files-found: ignore

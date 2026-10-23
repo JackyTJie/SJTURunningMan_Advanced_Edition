@@ -11,7 +11,7 @@
 | macOS | 构建部署目标为 **11.0**；实际兼容性待 macOS 真机验证 |
 | 架构 | Apple Silicon 与 Intel **通吃**，同一份 universal 包 |
 
-> Rust + Slint 构建不再依赖 PySide6。工作流配置 Intel / Apple Silicon 分别构建后合并；本轮在 Windows 上实施，尚未实际验证 macOS 构建、安装和运行。
+> Tauri 2 构建不再依赖 PySide6。工作流配置 Intel / Apple Silicon 分别构建后合并，并使用 macOS 系统 WKWebView；Apple 签名与公证仍需单独处理。
 
 ## 安装
 

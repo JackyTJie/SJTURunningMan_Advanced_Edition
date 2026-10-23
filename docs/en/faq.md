@@ -37,11 +37,11 @@ For Windows, review the source and use More info → Run anyway if appropriate. 
 
 ### Route preview does not open
 
-The in-app preview works offline. The map button opens a loopback-only HTTP page in the default browser, allowing OSM's required Referer. If an old map shows “403 / Access blocked”, close the old `file://` page and reopen it from the fixed client; reopen maps after restarting the client too. If loading still fails, check access to Leaflet/OSM. The page reports failures while retaining the track; see [desktop.md](desktop.md).
+The in-app preview works offline. The map button embeds an OpenStreetMap map from a loopback-only HTTP page inside the preview card, allowing OSM's required Referer, and no longer opens the system browser or shows an engine switch/status bar. If tiles fail to load, check access to Leaflet/OSM; the card reports failures while retaining the track, and reopening the map after restarting the client is enough. If an old map still shows “403 / Access blocked”, make sure it is not the old `file://` page; see [desktop.md](desktop.md).
 
 ### Missing executable icon
 
-Build the native executable with `build_windows.ps1`; `desktop/build.rs` embeds the icon. The repository no longer ships a PyInstaller spec, so the legacy packaging command cannot build the Rust client either.
+Build the native executable with `build_windows.ps1` (it builds the React frontend first); `desktop/src-tauri/build.rs` and the Tauri bundle config embed the icon and version. The repository no longer ships a PyInstaller spec, so the legacy packaging command cannot build the Tauri client either.
 
 ### Imported routes disappeared after restarting
 
@@ -49,11 +49,11 @@ Copies live in the OS user data directory’s `routes/`, independently of the in
 
 ### Import does nothing or rejects the file
 
-Use Import TXT and select UTF-8 text with one BD09 longitude,latitude pair per line. Limits are 2 MB and 30,000 distinct consecutive points. Cancellation makes no changes. See [routes.md](routes.md).
+On the Routes page, use Import TXT and select UTF-8 text with one BD09 longitude,latitude pair per line. Limits are 2 MB and 30,000 distinct consecutive points. Cancellation makes no changes. See [routes.md](routes.md).
 
 ### How is the graphical CAPTCHA handled?
 
-Automatic recognition through the legacy service has been restored. Refresh to retry if recognition fails, or use the manual fallback. Login preserves the legacy delay after recognition and follows the server's returned redirect. Account login and My SJTU app verification have been checked live. When the school requires a six-digit second-factor code, the account holder still needs to receive and enter it.
+The desktop client prefills the editable CAPTCHA field using the legacy recognition service. You can correct the result directly, refresh to retry, or fill in the same field manually if recognition fails. Login preserves the legacy delay after recognition and follows the server's returned redirect. Account login and My SJTU app verification have been checked live. When the school requires a six-digit second-factor code, the account holder still needs to receive and enter it.
 
 ---
 

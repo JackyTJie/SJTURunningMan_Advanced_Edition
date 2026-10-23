@@ -5,10 +5,10 @@
 | 平台 | 自动化测试 | 说明 |
 | --- | --- | --- |
 | 安卓 | ✅ 有 | 单元测试 + 仪器测试，见下 |
-| 电脑版 | ✅ 有 | Rust 单元测试、本地 HTTP mock、Slint 截图 smoke test |
+| 电脑版 | ✅ 有 | Rust 单元测试、本地 HTTP mock、后端 / 真实 WebView smoke test、Playwright 交互与截图检查 |
 | iOS | ❌ 无 | 无测试 target |
 | 鸿蒙 | ❌ 无 | 目前只能手动验收（见下） |
-| CI | ✅ 桌面测试 | `desktop-check.yml` 在 Ubuntu 跑 fmt / clippy / 单元测试；安装包构建与 smoke 只在 release 流程执行 |
+| CI | ✅ 桌面测试 | `desktop-check.yml` 在 Ubuntu 跑前端构建、fmt / clippy / 单元测试及 Chromium mock IPC 交互检查；安装包构建只在 release 流程执行 |
 
 **补充测试是欢迎的** —— 新增测试的约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
@@ -66,39 +66,76 @@ cd apps/android
 
 ---
 
-## 电脑版手动验收清单
+## 电脑版
 
-自动测试：`cargo test --workspace --locked`。格式及静态检查：`cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets --locked -- -D warnings`。
+自动测试与静态检查：
 
-离线界面验收：Release 产物运行 `--smoke-test target/smoke`，自动验证离线预览、错误参数、清空日志，以及下拉框鼠标打开、方向键选择、确认和禁用状态。保存 30 张截图：4 个页面 × 深浅主题 × 普通/最小窗口的 16 组组合，承诺书、4 类弹窗、运行进度/跨页面停止、空日志、长日志/提示换行、下拉交互状态，以及统计夹具下的首页「本学期进度」卡片与学期日历（计入成绩、无效记录、未跑三种状态与区间外空白格）。统计与日历使用固定夹具而非真实账号数据，测试使用独立用户数据目录，不登录、不上传；`smoke-result.json` 记录实际截图数量与夹具行数。
+```bash
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop build                  # tsc --noEmit + vite build
+cargo test --workspace --locked
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+python3 -m unittest discover -s scripts -p "test_*.py"
+```
 
-在线地图验收：运行 `--map-smoke-test target/map-smoke`，会通过正式界面回调生成默认轨迹预览与规划器，在目录内输出 `preview-url.txt`、`planner-url.txt`。保持测试窗口运行，用浏览器打开地址；检查瓦片 HTTP 200、真实本机 Referer、版权标识和 TXT 导出。隔离浏览器拦截瓦片并返回 403 时，应提示底图失败并保留轨迹，不反复重试。测试不登录、不上传；关闭测试窗口会停止本机服务，旧地址不能再刷新。
+### 后端离线 smoke
+
+Release 产物运行 `--smoke-test target/smoke`，不启动窗口，只验证默认路线解析、离线轨迹生成、参数边界与占位日历，并写出 `smoke-result.json`。它不登录、不上传。
+
+`--login-smoke-test target/login-smoke` 匿名获取并自动识别图形验证码，写出 `login-smoke-result.json`；不提交账号、不保存真实验证码图片。`--map-smoke-test target/map-smoke` 启动本机地图服务并保持进程，目录内输出 `preview-url.txt`、`planner-url.txt`，供浏览器检查瓦片、Referer、版权与错误提示；按 Ctrl+C 结束。
+
+### 真实 WebView smoke
+
+```bash
+./target/release/sjturunningman --ui-smoke-test target/ui-smoke
+```
+
+该命令启动真实 Tauri 窗口，等待 React 渲染后依次检查：工作台、`md-*` 组件注册、轨迹 SVG、承诺书打开 / 勾选 / 关闭、预览卡片内嵌地图（iframe、子页面就绪消息、不出现「已在地图中显示当前轨迹」顶部提示、工作台不显示「收起地图」、路线管理页收起后恢复 SVG）与四个导航页面。结果写入 `target/ui-smoke/ui-smoke-result.json`，`success` 为 `true` 时退出码为 0。它不登录、不上传，使用独立数据目录。
+
+### Playwright 视觉与交互检查（可选）
+
+`desktop/e2e/` 用 mock IPC 在 Chromium 中跑生产前端，覆盖表单绑定、下拉框、开关、主题、分段按钮、登录、二次验证、任务事件与日志。它不访问 SJTU 服务，也不能替代真实 WebView 验收。
+
+```bash
+pnpm --dir desktop build
+pnpm --dir desktop exec vite preview --port 4173 --strictPort   # 终端 1
+node desktop/e2e/check.mjs                                      # 终端 2：断言
+node desktop/e2e/screenshot.mjs                                 # 截图到 /tmp/ui-shots
+```
+
+### 手动验收清单
 
 - [ ] 首次窗口展示承诺书；未勾选不能进入，退出可关闭。
-- [ ] 次数 0 / 31、距离 NaN / 0 / 6、日期 2026/10/15、时间 8:00 被拒绝。
-- [ ] 深浅色主题、中文、键盘 Tab / Enter / Space、系统缩放与小窗口滚动均可用。
-- [ ] 日志说明与清空按钮互不遮挡，正文左上对齐；长日志和长提示正常换行。
-- [ ] 表单/下拉框边框一致；删除禁用态清晰；工作台空闲进度轨道为浅色，其他页面空闲时没有任务控制栏。
-- [ ] 内置 default 可选；TXT 导入、重复命名、重启持久化正常；只能删除导入副本，源文件不受影响。
-- [ ] 未登录可生成实际轨迹；长度含旧版固定 200 m 补偿；开放路线往返，闭合路线循环；原始跳段超过 150 m 有提醒。
-- [ ] 系统浏览器地图的起终点和轨迹符合预览；规划器导出 TXT 可重新导入。
-- [ ] 有效账号可以通过自动识别图形验证码登录，识别异常时可刷新或手动备用输入；如需，完成交我办 / 邮箱 / 短信验证；错误及过期状态可恢复。
+- [ ] 登录未填齐时按钮禁用；输入与输入法确认不触发请求或清空密码；显示密码 / 刷新验证码不触发登录；填齐后点击或 Enter 只提交一次；登录失败后重新编辑清除旧错误。
+- [ ] 次数 0 / 31、距离 NaN / 0 / 1.19 / 5.01 / 6、日期 2026/10/15 被拒绝；开始时间只能通过选择器产生有效值。
+- [ ] 深浅色主题、中文、键盘 Tab / Enter / Space、系统缩放与小窗口滚动均可用；原生标题栏随主题切换。
+- [ ] 侧栏、卡片、按钮、输入框、下拉框、开关、对话框使用 Material Design 3 的角色与形状；没有混入其他 UI 组件库。
+- [ ] 未登录可生成实际轨迹；1.20 / 1.21 / 4 / 5 km 的轨迹长度与所选距离一致，不含额外 200 m 补偿；开放路线往返，闭合路线循环；跳段超过 150 m 时红色高亮并提示。
+- [ ] 拖动单次距离后轨迹预览自动更新并清除过期标记，且不弹顶部提示；修改次数 / 日期 / 时间后标记为过期，切换路线后重新显示原始路线；重新生成后地图、摘要与距离一致。
+- [ ] 滑条范围 1.20–5.00 km；Home / End 与方向键不越界，左右距离一致；旧设置低于 1.20 km 时恢复至下限，自动排计划也不低于 1.20 km。
+- [ ] 参数区摘要随次数、距离、日期与开始时间实时更新；窗口较矮时可滚动到路线选择。
+- [ ] 跑步次数输入框与日期 / 时间字段同高，字段说明与距离说明对齐；预览卡片三个指标的文字基线一致；路线下拉与选择框左对齐且不被底栏遮住。
+- [ ] 点击开始时间打开紧凑的 12 小时制时间选择对话框（约 328 px 宽，不占满窗口），选时 / 分和 AM/PM（不显示秒）后「确定」回填，取消或 Esc 不修改；字段与摘要同步显示 `hh:mm AM/PM`。
+- [ ] 操作结果以浮层 snackbar 出现在右上角，不推动下方内容，约 6 秒后自动收起；成功 / 错误使用对应的 MD3 容器色。
+- [ ] 单列布局下打开结束日期日历或路线下拉，弹层盖在预览卡片之上，不被遮挡。
+- [ ] 内置 default 可选；在「路线管理」页完成 TXT 导入、重复命名、重启持久化正常；只能删除导入副本，源文件不受影响。
+- [ ] 「在地图中打开」在预览卡片内嵌显示，起终点和轨迹符合预览；工作台无「收起地图」按钮，路线管理页可收起回到 SVG；规划器仍在浏览器打开并可导出 TXT 重新导入。
+- [ ] 有效账号可以通过自动识别图形验证码登录，识别异常时可刷新或手动备用输入；如需，完成交我办 / 邮箱 / 短信验证；错误及过期状态可恢复；密码在提交后立即从输入框清除。
+- [ ] 二次验证：交我办 / 邮箱 / 短信均能发送；在有效期内提交 6 位验证码成功；重新发送后旧验证码失效；错误提示能区分验证码过期、会话失效与其他错误码。
 - [ ] 登录成功后「本学期进度」与学期日历自动同步；未登录或同步失败时保持 `--` 与占位灰日历，退出账号后同样恢复占位。
-- [ ] 学期日历区分计入成绩（实心绿）、无效记录（描边）与未跑（灰）三种状态，区间外日期为空白格；最小窗口 1040×700 下日历与日志两栏不溢出。
+- [ ] 学期日历区分计入成绩（实心蓝）、无效记录（描边红）与未跑（灰）三种状态，区间外日期为空白格；1000×700 最小窗口下日志两栏可滚动、不溢出。
 - [ ] 学期数据同步失败只在日志提示一行，不改变登录状态、不自动登出。
 - [ ] 经授权的真实业务验收中，进度与结果正确；失败的 POST 不自动重试。
 - [ ] 停止任务及关闭窗口不会再发送后续记录；正在处理的 HTTP 请求最多等待 15 秒；界面保持响应。
 - [ ] 退出账号后会话清除；偏好文件、日志与截图不包含真实凭据。
-- [ ] 学期统计的日志与 `smoke-result.json` 不包含 Cookie、uid 或服务器响应正文。
+- [ ] 学期统计的日志与 smoke 结果不包含 Cookie、uid 或服务器响应正文。
 - [ ] 更新检查只在点击时发起，弱网或超时给出清晰信息。
-- [ ] Windows exe 的图标和版本正确，可移到无 assets 的目录运行；不依赖 Python / Qt / MSYS2 DLL。
-- [ ] macOS 两个架构构建后由 lipo 合并；DMG 内有 app 和 Applications 链接，分别在 Intel / Apple Silicon 验收。
-- [ ] macOS 上界面中文完整可见（导航、表单标签、日志、承诺书全文），不只显示数字与拉丁字母 —— 字体注册失败时会出现整段中文空白，见 [验证记录](desktop-validation.md)。
-- [ ] Linux amd64 / arm64 deb 在 Ubuntu 24.04 对应架构安装，分别验证 X11 / Wayland 和文件选择器。
+- [ ] Windows exe 的图标和版本正确，可移到无 assets 的目录运行；用户机器有 WebView2 Runtime；不依赖 Python / Qt / MSYS2 DLL。
+- [ ] macOS 两个架构构建后由 lipo 合并；DMG 内有 app 和 Applications 链接，分别在 Intel / Apple Silicon 验收；界面中文完整可见。
+- [ ] Linux amd64 / arm64 deb 在 Ubuntu 24.04 对应架构安装，分别验证 X11 / Wayland、WebKitGTK 依赖与文件选择器。
 
-本机 Windows 验证不能替代 macOS / Linux 真机验证；离线与本地 HTTP mock 测试不能证明真实认证、二次验证与上传已端到端通过。
-
----
+本机 Windows / macOS 验证不能替代其他平台真机验证；离线、mock 与 `--ui-smoke-test` 都不能证明真实认证、二次验证与上传已端到端通过。
 
 ## iOS 手动验收清单
 

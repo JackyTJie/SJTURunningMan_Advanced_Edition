@@ -50,7 +50,7 @@ htmlcov/
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon?
+/Icon?
 ._*
 .Spotlight-V100
 .Trashes
@@ -156,3 +156,18 @@ refs/
 *.temp
 *.pid
 *.seed
+
+# =========================
+# Desktop web frontend / Tauri
+# =========================
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/test-results/
+desktop/playwright-report/
+.pnpm-store/
+.pnpm-cache/
+.npm-cache/
+.cargo-home/
+
+desktop/src-tauri/gen/
