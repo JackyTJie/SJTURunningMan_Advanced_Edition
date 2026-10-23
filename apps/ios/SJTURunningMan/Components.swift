@@ -391,31 +391,62 @@ struct TimeField: View {
     let second: Int
     let onChange: (Int, Int, Int) -> Void
 
+    @State private var selection: Date
+
+    init(hour: Int, minute: Int, second: Int, onChange: @escaping (Int, Int, Int) -> Void) {
+        self.hour = hour
+        self.minute = minute
+        self.second = second
+        self.onChange = onChange
+        _selection = State(initialValue: Self.makeDate(hour: hour, minute: minute, second: second))
+    }
+
     var body: some View {
-        HStack(spacing: 6) {
-            NumberField(value: String(format: "%02d", hour), label: "时", width: 62, maxLength: 2) { value in
-                onChange(clamp(value, fallback: hour, upper: 23), minute, second)
+        DatePicker("开始时间", selection: $selection, displayedComponents: .hourAndMinute)
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .tint(AppTheme.primary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 158)
+            .clipped()
+            .background(AppTheme.cardLow, in: RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius)
+                    .strokeBorder(AppTheme.outlineVariant, lineWidth: 1)
             }
-            separator
-            NumberField(value: String(format: "%02d", minute), label: "分", width: 62, maxLength: 2) { value in
-                onChange(hour, clamp(value, fallback: minute, upper: 59), second)
-            }
-            separator
-            NumberField(value: String(format: "%02d", second), label: "秒", width: 62, maxLength: 2) { value in
-                onChange(hour, minute, clamp(value, fallback: second, upper: 59))
-            }
+            .accessibilityLabel("开始时间")
+            .onChange(of: selection) { _, _ in publishSelection() }
+            .onChange(of: hour) { _, _ in syncSelection() }
+            .onChange(of: minute) { _, _ in syncSelection() }
+            .onChange(of: second) { _, _ in syncSelection() }
+    }
+
+    private func publishSelection() {
+        let parts = Calendar.current.dateComponents([.hour, .minute, .second], from: selection)
+        let newHour = parts.hour ?? hour
+        let newMinute = parts.minute ?? minute
+        let newSecond = parts.second ?? second
+        guard newHour != hour || newMinute != minute || newSecond != second else { return }
+        onChange(newHour, newMinute, newSecond)
+    }
+
+    private func syncSelection() {
+        let next = Self.makeDate(hour: hour, minute: minute, second: second)
+        let current = Calendar.current.dateComponents([.hour, .minute, .second], from: selection)
+        let nextParts = Calendar.current.dateComponents([.hour, .minute, .second], from: next)
+        guard current.hour != nextParts.hour || current.minute != nextParts.minute || current.second != nextParts.second else {
+            return
         }
+        selection = next
     }
 
-    private var separator: some View {
-        Text(":")
-            .font(.headline)
-            .foregroundStyle(AppTheme.onSurfaceVariant)
-    }
-
-    private func clamp(_ text: String, fallback: Int, upper: Int) -> Int {
-        guard let parsed = Int(text) else { return fallback }
-        return min(max(parsed, 0), upper)
+    private static func makeDate(hour: Int, minute: Int, second: Int) -> Date {
+        let calendar = Calendar.current
+        var parts = calendar.dateComponents([.year, .month, .day], from: Date())
+        parts.hour = hour
+        parts.minute = minute
+        parts.second = second
+        return calendar.date(from: parts) ?? Date()
     }
 }
 
@@ -626,5 +657,446 @@ struct DisclaimerNotice: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(AppTheme.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+    }
+}
+
+// MARK: - 本学期进度
+
+/// 「本学期进度」卡片：只读展示当前学期的达标公里与完成率，未登录时两个数值都是 `--`。
+struct SemesterCard: View {
+    let loggedIn: Bool
+    let kmText: String
+    let percentText: String
+
+    var body: some View {
+        SectionCard(
+            title: "本学期进度",
+            icon: "chart.bar.xaxis",
+            supporting: loggedIn
+                ? "登录状态下自动同步，只读展示当前学期。"
+                : "登录账号后自动同步本学期数据。"
+        ) {
+            SectionDivider()
+            HStack(spacing: 14) {
+                SemesterMetric(label: "达标公里", value: kmText)
+                SemesterMetric(label: "完成率", value: percentText)
+            }
+        }
+    }
+}
+
+private struct SemesterMetric: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(AppTheme.onSurfaceVariant)
+            Text(value)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(AppTheme.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - 学期日历
+
+private let weekLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+/// 周一起始，逐月展开本学期每一天。
+///
+/// 实心绿 = 计入成绩，描边 = 有记录但未计入，灰 = 未跑，空白格 = 补齐或不在学期内。
+struct SemesterCalendar: View {
+    let loggedIn: Bool
+    let weeks: [CalendarWeek]
+
+    var body: some View {
+        SectionCard(
+            title: "学期日历",
+            icon: "calendar",
+            supporting: loggedIn
+                ? "实心绿=计入成绩，描边=无效记录，灰=未跑。"
+                : "登录后显示本学期打卡记录。"
+        ) {
+            SectionDivider()
+            HStack(spacing: 0) {
+                ForEach(weekLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.caption2)
+                        .foregroundStyle(AppTheme.onSurfaceVariant)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            VStack(spacing: 2) {
+                ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
+                    VStack(spacing: 2) {
+                        Text(week.title)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.onSurfaceVariant)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: week.title.isEmpty ? 0 : 18)
+                        HStack(spacing: 0) {
+                            ForEach(Array(week.days.enumerated()), id: \.offset) { _, day in
+                                CalendarDayCell(day: day)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+            }
+            if weeks.isEmpty {
+                Text("服务器未返回本学期起止日期。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+private struct CalendarDayCell: View {
+    let day: CalendarDay
+
+    var body: some View {
+        ZStack {
+            if day.day > 0 {
+                // 无效记录只描边，不填实心绿，和电脑版 DayCell 一致。
+                Circle()
+                    .fill(background)
+                    .overlay(
+                        day.state == .invalid
+                            ? Circle().strokeBorder(AppTheme.primary, lineWidth: 1)
+                            : nil
+                    )
+                    .frame(width: 24, height: 24)
+                Text("\(day.day)")
+                    .font(.system(size: 11, weight: day.state == .valid ? .semibold : .regular))
+                    .foregroundStyle(AppTheme.calendarInk)
+            }
+        }
+        .frame(height: 26)
+    }
+
+    private var background: Color {
+        switch day.state {
+        case .valid: return AppTheme.runValid
+        case .invalid: return AppTheme.runInvalid
+        case .none: return AppTheme.calendarEmpty
+        }
+    }
+}
+
+// MARK: - 跳过已有记录的日期
+
+/// 开关行，沿用品牌蓝和统一的卡片底色。
+struct SkipExistingRow: View {
+    let checked: Bool
+    let enabled: Bool
+    let onCheckedChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Toggle("", isOn: Binding(get: { checked }, set: onCheckedChange))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(AppTheme.primary)
+                .disabled(!enabled)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("跳过已有记录的日期")
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.onSurface)
+                Text("已有记录的那几天挪到更早日期。")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(AppTheme.cardLow, in: RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius)
+                .strokeBorder(AppTheme.outlineVariant, lineWidth: 1)
+        }
+    }
+}
+
+// MARK: - 浮层提示
+
+/// 贴在顶栏下方浮在内容之上，不再把下方内容往下推。
+struct NoticeOverlay: View {
+    let notice: Notice?
+
+    var body: some View {
+        if let notice {
+            Text(notice.text)
+                .font(.callout)
+                .foregroundStyle(AppTheme.onSurface)
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: AppTheme.panelCornerRadius))
+                .transition(.opacity)
+                .id(notice.id)
+        }
+    }
+}
+
+// MARK: - 关于软件
+
+/// 与电脑版的三张卡片一一对应 —— 软件信息、更新与社区、使用说明。
+///
+/// 更新检查只在点击「检查更新」时发起，结果只以一行文字呈现，不弹窗。
+struct AboutPanel: View {
+    @State private var result: UpdateResult?
+    @State private var checking = false
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SectionCard(title: "交我润", icon: "info.circle") {
+                HStack(spacing: 10) {
+                    Text("SJTU RunningMan")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(AppTheme.onSurface)
+                    StatusPill(text: "v\(AppConfig.versionName)", color: AppTheme.primary)
+                    Spacer(minLength: 0)
+                }
+                Text("iOS 客户端 · Swift 与 SwiftUI")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+                SectionDivider()
+                Text(AppConfig.creditsText)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+            }
+
+            SectionCard(title: "更新与社区", icon: "arrow.down.circle") {
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundStyle(statusColor)
+                HStack(spacing: 10) {
+                    if checking {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("检查中…").font(.subheadline)
+                        }
+                    } else {
+                        Button {
+                            checking = true
+                        } label: {
+                            Label("检查更新", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.glass)
+                    }
+                    Spacer(minLength: 0)
+                }
+                SectionDivider()
+                HStack(spacing: 8) {
+                    linkButton("仓库", "chevron.left.forwardslash.chevron.right", AppConfig.githubRepoURL)
+                    linkButton("水源", "arrow.up.right.square", AppConfig.shuiyuanTopicURL)
+                    if case .updateAvailable(_, let latest) = result {
+                        linkButton("下载", "arrow.down.circle", latest.url)
+                    }
+                }
+            }
+
+            SectionCard(title: "使用说明", icon: "text.document") {
+                Text(AppConfig.disclaimerText)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .task(id: checking) {
+            guard checking else { return }
+            result = await UpdateChecker.checkForUpdates()
+            checking = false
+        }
+    }
+
+    private var statusText: String {
+        switch result {
+        case .upToDate(_, let latestTag): return "已是最新版本 \(latestTag)"
+        case .updateAvailable(_, let latest): return "发现新版本 \(latest.tag)"
+        case .failed(let reason): return "检查更新失败：\(reason)"
+        case .none: return "尚未检查更新。"
+        }
+    }
+
+    private var statusColor: Color {
+        switch result {
+        case .upToDate, .updateAvailable: return AppTheme.success
+        case .failed: return AppTheme.error
+        case .none: return AppTheme.onSurfaceVariant
+        }
+    }
+
+    @ViewBuilder
+    private func linkButton(_ title: String, _ systemImage: String, _ urlString: String) -> some View {
+        if let url = URL(string: urlString), !urlString.isEmpty {
+            Link(destination: url) {
+                Label(title, systemImage: systemImage)
+                    .font(.footnote.weight(.medium))
+            }
+            .buttonStyle(.glass)
+        }
+    }
+}
+
+// MARK: - 悬浮玻璃标签栏
+
+struct LiquidTabItem: Identifiable {
+    let id: Int
+    let title: String
+    let systemImage: String
+}
+
+/// 悬浮式 Liquid Glass 标签栏。
+/// 支持点击、左右滑动切页，以及按住选中胶囊横向拖动后吸附到最近一项。
+struct LiquidTabBar: View {
+    @Binding var selection: Int
+    let items: [LiquidTabItem]
+
+    @State private var dragPosition: CGFloat?
+    @State private var dragIndex: Int?
+
+    private var selectedIndex: Int {
+        items.firstIndex(where: { $0.id == selection }) ?? 0
+    }
+
+    private var activeIndex: Int {
+        dragIndex ?? selectedIndex
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let inset: CGFloat = 7
+            let itemWidth = max((proxy.size.width - inset * 2) / CGFloat(max(items.count, 1)), 1)
+            let indicatorWidth = max(itemWidth - 8, 1)
+            let position = dragPosition ?? CGFloat(selectedIndex)
+
+            ZStack(alignment: .leading) {
+                selectionIndicator
+                    .frame(width: indicatorWidth, height: 50)
+                    .offset(x: inset + itemWidth * position + 4)
+                    .animation(
+                        dragPosition == nil ? .snappy(duration: 0.34, extraBounce: 0.10) : nil,
+                        value: position
+                    )
+
+                HStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        let isActive = index == activeIndex
+                        Button {
+                            select(item)
+                        } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: item.systemImage)
+                                    .font(.system(size: 17, weight: isActive ? .semibold : .regular))
+                                    .symbolRenderingMode(.monochrome)
+                                    .frame(width: 22, height: 18)
+                                Text(item.title)
+                                    .font(.system(size: 10, weight: isActive ? .semibold : .medium))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
+                            }
+                            .foregroundStyle(isActive ? AppTheme.primary : AppTheme.onSurfaceVariant.opacity(0.82))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: itemWidth, height: 50)
+                        .accessibilityLabel(item.title)
+                        .accessibilityValue(item.id == selection ? "已选中" : "")
+                    }
+                }
+                .padding(.horizontal, inset)
+                .animation(.easeOut(duration: 0.16), value: activeIndex)
+            }
+            .frame(width: proxy.size.width, height: 64)
+            .glassEffect(.regular, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.52), .white.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.8
+                    )
+            }
+            .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
+            .contentShape(Capsule())
+            .simultaneousGesture(dragGesture(itemWidth: itemWidth, inset: inset))
+            .sensoryFeedback(.selection, trigger: activeIndex)
+        }
+        .frame(height: 64)
+    }
+
+    private var selectionIndicator: some View {
+        Capsule()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        AppTheme.primary.opacity(0.38),
+                        AppTheme.primary.opacity(0.16)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.68), .white.opacity(0.08)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 0.9
+                    )
+            }
+            .overlay(alignment: .top) {
+                Capsule()
+                    .fill(.white.opacity(0.30))
+                    .frame(height: 1)
+                    .padding(.horizontal, 18)
+            }
+            .shadow(color: AppTheme.primary.opacity(0.26), radius: 10, y: 4)
+            .allowsHitTesting(false)
+    }
+
+    private func select(_ item: LiquidTabItem) {
+        guard item.id != selection else { return }
+        withAnimation(.snappy(duration: 0.32, extraBounce: 0.10)) {
+            selection = item.id
+        }
+    }
+
+    private func dragGesture(itemWidth: CGFloat, inset: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .onChanged { value in
+                guard !items.isEmpty else { return }
+                let rawPosition = (value.location.x - inset) / itemWidth - 0.5
+                let position = min(max(rawPosition, 0), CGFloat(items.count - 1))
+                dragPosition = position
+                dragIndex = Int(position.rounded())
+            }
+            .onEnded { _ in
+                guard !items.isEmpty else { return }
+                let targetIndex = dragIndex ?? selectedIndex
+                withAnimation(.snappy(duration: 0.34, extraBounce: 0.12)) {
+                    if items.indices.contains(targetIndex) {
+                        selection = items[targetIndex].id
+                    }
+                    dragPosition = nil
+                    dragIndex = nil
+                }
+            }
     }
 }

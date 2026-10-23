@@ -13,7 +13,8 @@ There is **no prebuilt package** for iOS — you build and sign it yourself with
 - [3. Signing](#3-signing)
 - [4. Build and run](#4-build-and-run)
 - [5. Usage](#5-usage)
-- [6. File structure](#6-file-structure)
+- [6. Semester data](#6-semester-data)
+- [7. File structure](#7-file-structure)
 
 ## 1. Requirements
 
@@ -72,26 +73,43 @@ On first run you may hit:
 
 ## 5. Usage
 
+The UI matches the Android and desktop clients' features. A floating Liquid Glass dock at the bottom holds four tabs — **Workbench / Routes / Logs / About**. You can drag the selected capsule sideways, tap an item, or swipe the page horizontally to switch. While a task runs, the non-workbench tabs keep a compact status bar with a "stop task" button.
+
 1. **Login** — the app opens the JAccount OAuth2 page; log in with your SJTU credentials.
-2. **Set parameters** — count, time, date, distance (1–5 km, default 4 km).
+2. **Set parameters** — on the Workbench tab, set run count, time, end date and distance (1–5 km, default 4 km).
 3. **Start** — tap "开始任务". The app will:
    - fetch your UID from the PE platform;
    - generate GPS track data from the route coordinates;
    - randomize pace between 4–6 min/km;
    - upload each day's track one by one.
-4. **Monitor** — the live log shows progress.
+4. **Monitor** — the live log on the Logs tab shows progress and the result of every record.
 5. **Re-login** — when the session expires the app prompts you to log in again.
 
-## 6. File structure
+## 6. Semester data
+
+After a successful login the app syncs the current semester read-only in the background; no manual refresh. Same rules as the Android and desktop clients.
+
+- **"本学期进度" card** (Workbench): shows the current semester's **qualified kilometres** and **completion rate**. When logged out or the sync failed, both show `--` and the calendar stays a placeholder.
+- **"学期日历" (semester calendar)** (Logs): weeks start on Monday and every semester day is laid out month by month. Solid green = counts towards the grade, outlined = recorded but not counted, grey = not run, blank cell = outside the semester range. If the server gives no semester range it says "服务器未返回本学期起止日期。"
+- **Skip days that already have records** (Workbench switch, on by default): days already present in the semester calendar are shifted to earlier dates, and the number of uploads still equals the configured count; the look-back is capped at 120 days and never crosses the semester start, and a shortfall is reported honestly. Turning it off generates consecutive days backwards from the end date.
+- **Automatic run plan after login**: the first semester sync after a login derives "run count × distance per run" from the kilometres still missing this semester (1–5 km per run, at most 30 runs, rounded up so the gap is actually covered) and fills them into the UI. If you changed either value by hand they stay as they are, with the reason logged only. Auto-filled values survive app restarts.
+- After a task with at least one successful upload, the progress card and the calendar refresh once, so the day's record appears on the calendar.
+- Semester data is shown for the current session only and is **never written to disk**; a failed sync logs one line, does not change the login state and never logs you out.
+
+## 7. File structure
 
 ```
 apps/ios/
 ├── SJTURunningMan/
 │   ├── SJTURunningManApp.swift      App entry point
 │   ├── LoginView.swift              JAccount OAuth2 WebView
-│   ├── MainView.swift               Parameter settings & UI
-│   ├── MainViewModel.swift          Upload logic & state
-│   ├── ApiService.swift             HTTP client (fetch UID, upload results)
+│   ├── MainView.swift               Four tabs and screen assembly
+│   ├── MainViewModel.swift          Upload logic, semester stats & state
+│   ├── ApiService.swift             HTTP client (UID, upload, semester stats)
+│   ├── SemesterStats.swift          Semester stats logic and calendar expansion
+│   ├── RunSchedule.swift            Upload day scheduling and skipping existing days
+│   ├── Components.swift             Cards, semester calendar, switches, etc.
+│   ├── Dialogs.swift                Commitment and route-conflict dialogs
 │   ├── DataGenerator.swift          GPS track generator
 │   ├── GpsUtil.swift                Coordinate utilities
 │   ├── RouteManager.swift           Route management
