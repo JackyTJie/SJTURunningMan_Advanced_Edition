@@ -24,6 +24,10 @@ enum AppConfig {
     static let myDataURL = "https://pe.sjtu.edu.cn/sports/my/data"
     static let pointRuleURL = "https://pe.sjtu.edu.cn/api/running/point-rule"
     static let uploadURL = "https://pe.sjtu.edu.cn/api/running/result/upload"
+    static let semesterTargetURL = "https://pe.sjtu.edu.cn/sports/my/semesterTarget"
+    static let semesterListURL = "https://pe.sjtu.edu.cn/sports/running/semester/list"
+    static let userInfoURL = "https://pe.sjtu.edu.cn/sports/ranking/getUserInfo"
+    static let resultListURL = "https://pe.sjtu.edu.cn/sports/running/result/list"
 
     // MARK: - 任务参数
 
@@ -55,7 +59,6 @@ enum AppConfig {
         "4. 我承诺不会将本软件用于伪造运动数据、规避体育锻炼要求或其他违规操作。"
 
     static let creditsText =
-        "界面优化：Github@CEQ151\n" +
         "三改：Github@JackyTJie\n" +
         "二改：Github@accelerator-s\n" +
         "原作者：Github@Labyrinth0419"

@@ -49,6 +49,13 @@ enum AppTheme {
     static let console = adaptive(light: 0x10151C, dark: 0x080C11)
     static let consoleOn = adaptive(light: 0xD7E3EE, dark: 0xC9D6E2)
 
+    // MARK: - 学期日历
+
+    static let runValid = adaptive(light: 0xA9DCB5, dark: 0x4F9C68)
+    static let runInvalid = adaptive(light: 0xDCECD9, dark: 0x2F5C43)
+    static let calendarEmpty = adaptive(light: 0xEEF2EF, dark: 0x26362E)
+    static let calendarInk = adaptive(light: 0x1C3327, dark: 0xDCEBE0)
+
     // MARK: - 背景渐变
 
     static let gradientStart = adaptive(light: 0xD6ECFB, dark: 0x12293A)

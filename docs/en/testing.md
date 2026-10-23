@@ -144,6 +144,13 @@ Windows/macOS checks do not replace other-platform validation. Offline, mock and
 - [ ] "Start task" after configuring parameters fetches the UID
 - [ ] The log scrolls live with per-record progress
 - [ ] An expired session shows a working "re-login" button
+- [ ] The floating bottom dock shows a matching icon and label for Workbench / Routes / Logs / About; all four switch on tap, the selected capsule can be dragged sideways and snaps to an adjacent item, and horizontal page swipes also switch tabs; while a task runs, non-workbench tabs also show the compact status bar with "stop task"
+- [ ] After login the progress card shows qualified kilometres and completion rate; both are `--` when logged out
+- [ ] The semester calendar on the Logs tab expands month by month starting on Monday, with solid-green / outlined / grey cells matching the server records
+- [ ] With "skip days that already have records" on, recorded days move to earlier dates and the record count is unchanged, the skipped dates are listed in the log; with it off, days are generated consecutively backwards
+- [ ] When the look-back hits the semester start or the 120-day cap and still cannot cover the count, the log reports that only N uploadable days were found; when there are none, the task does not start and says so
+- [ ] After login the run count and distance per run are set automatically from the missing kilometres with a notice overlay; if you edited either value they stay unchanged and the reason is logged only; auto values survive an app restart
+- [ ] After at least one successful upload, the progress card and calendar refresh once
 
 ---
 

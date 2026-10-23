@@ -2,11 +2,18 @@
 //  MainView.swift
 //  SJTURunningMan
 //
-//  主界面：状态卡、跑步路线、任务设置、运行日志与底部操作栏。
-//  结构对齐安卓版 ui/MainScreen.kt，卡片与按钮采用 iOS 26/27 Liquid Glass 外观。
+//  主界面：四个页面 —— 工作台 / 路线 / 任务日志 / 关于软件。
+//  卡片与按钮采用 iOS 26/27 Liquid Glass 外观。
 //
 
 import SwiftUI
+
+private let navTabs: [LiquidTabItem] = [
+    LiquidTabItem(id: 0, title: "工作台", systemImage: "figure.run"),
+    LiquidTabItem(id: 1, title: "路线", systemImage: "map"),
+    LiquidTabItem(id: 2, title: "任务日志", systemImage: "terminal"),
+    LiquidTabItem(id: 3, title: "关于软件", systemImage: "info.circle")
+]
 
 struct MainView: View {
     @State private var viewModel = MainViewModel()
@@ -14,13 +21,12 @@ struct MainView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     // 弹窗与导航
+    @State private var tab = 0
     @State private var showLogin = false
     @State private var showRouteDesign = false
     @State private var showDatePicker = false
-    @State private var showAbout = false
     @State private var showCommitment = false
     @State private var routeToDelete: RouteInfo?
-    @State private var snackbarMessage: String?
 
     // 任务参数
     @State private var days = 1
@@ -54,44 +60,50 @@ struct MainView: View {
     var body: some View {
         ZStack {
             NavigationStack {
-                ScrollView {
-                    VStack(spacing: 14) {
-                        statusCard
-                        if viewModel.reloginRequired {
-                            reloginBanner
-                        }
-                        routeSection
-                        settingsSection
-                        logSection
-                        DisclaimerNotice()
-                        Spacer().frame(height: 8)
+                ZStack {
+                    backgroundGradient
+
+                    TabView(selection: $tab) {
+                        tabPage(for: 0) { workbenchTab }
+                        tabPage(for: 1) { routesTab }
+                        tabPage(for: 2) { logsTab }
+                        tabPage(for: 3) { AboutPanel() }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                 }
-                .background(backgroundGradient)
                 .navigationTitle("交我润")
-                .navigationSubtitle("v\(AppConfig.versionName)")
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .toolbar { toolbarContent }
-                .safeAreaInset(edge: .bottom) { bottomBar }
+                .safeAreaInset(edge: .bottom) { bottomArea }
             }
 
-            snackbarLayer
+            noticeLayer
             dialogLayer
         }
         .animation(.easeInOut(duration: 0.2), value: showCommitment)
-        .animation(.easeInOut(duration: 0.2), value: showAbout)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.notice?.id)
         .animation(.easeInOut(duration: 0.2), value: viewModel.routeConflict)
         .animation(.easeInOut(duration: 0.2), value: routeToDelete)
+        .animation(.snappy(duration: 0.32, extraBounce: 0.06), value: tab)
         .task(id: config) { viewModel.updateConfig(config) }
+        // 自动排计划生效后把界面上的次数与距离一起对齐。
+        .onChange(of: viewModel.autoPlanApplied) { _, applied in
+            guard let applied else { return }
+            days = applied.runs
+            distanceKm = applied.distanceKm
+            showCustomDays = false
+        }
         .onAppear {
             if !commitmentAccepted {
                 showCommitment = true
             }
         }
         .sheet(isPresented: $showLogin) {
-            LoginView { showLogin = false }
+            LoginView {
+                showLogin = false
+                viewModel.onLoginSucceeded()
+            }
         }
         .sheet(isPresented: $showRouteDesign, onDismiss: { viewModel.refreshRoutes() }) {
             RouteDesignView()
@@ -104,11 +116,27 @@ struct MainView: View {
     // MARK: - 背景与工具栏
 
     private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [AppTheme.gradientStart.opacity(0.55), AppTheme.background],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            AppTheme.background
+
+            LinearGradient(
+                colors: [AppTheme.gradientStart.opacity(0.72), AppTheme.background.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(AppTheme.primary.opacity(0.14))
+                .frame(width: 320, height: 320)
+                .blur(radius: 80)
+                .offset(x: -150, y: -290)
+
+            Circle()
+                .fill(AppTheme.tertiary.opacity(0.10))
+                .frame(width: 280, height: 280)
+                .blur(radius: 90)
+                .offset(x: 170, y: -70)
+        }
         .ignoresSafeArea()
     }
 
@@ -116,25 +144,34 @@ struct MainView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Button {
-                showAbout = true
-            } label: {
-                Image(systemName: "info.circle")
-            }
-            .accessibilityLabel("关于与检查更新")
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
                 showLogin = true
             } label: {
-                Image(systemName: "person.badge.key")
+                Image(systemName: viewModel.loggedIn ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.exclamationmark")
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(viewModel.loggedIn ? AppTheme.primary : AppTheme.warning)
             }
-            .accessibilityLabel("重新登录")
+            .accessibilityLabel(viewModel.loggedIn ? "账号已登录，点按重新登录" : "未登录，点按登录")
         }
     }
 
-    // MARK: - 状态卡
+    /// 每个标签页保留独立的滚动位置，同时允许左右滑动切页。
+    private func tabPage<Content: View>(for index: Int, @ViewBuilder content: () -> Content) -> some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                content()
+                Spacer().frame(height: 8)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .scrollIndicators(.hidden)
+        .tag(index)
+    }
 
-    private var statusCard: some View {
+    // MARK: - 工作台
+
+    @ViewBuilder
+    private var workbenchTab: some View {
         StatusCard(
             progress: viewModel.progress,
             headline: "\(days) 次 · \(String(format: "%.1f", distanceKm)) km",
@@ -144,6 +181,16 @@ struct MainView: View {
                 StatItem("时间", String(format: "%02d:%02d:%02d", hour, minute, second))
             ]
         )
+        SemesterCard(
+            loggedIn: viewModel.loggedIn,
+            kmText: viewModel.semester.kmText,
+            percentText: viewModel.semester.percentText
+        )
+        if viewModel.reloginRequired {
+            reloginBanner
+        }
+        settingsSection
+        DisclaimerNotice()
     }
 
     private var reloginBanner: some View {
@@ -163,9 +210,9 @@ struct MainView: View {
         }
     }
 
-    // MARK: - 跑步路线
+    // MARK: - 路线
 
-    private var routeSection: some View {
+    private var routesTab: some View {
         SectionCard(
             title: "跑步路线",
             icon: "point.topleft.down.curvedto.point.bottomright.up",
@@ -246,6 +293,15 @@ struct MainView: View {
                     .tint(AppTheme.error)
                     .disabled(viewModel.running || viewModel.selectedRoute == nil || viewModel.selectedRoute?.isDefault == true)
                 }
+
+                Button {
+                    showRouteDesign = true
+                } label: {
+                    Label("设计新路线", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(viewModel.running)
             }
         }
     }
@@ -282,6 +338,7 @@ struct MainView: View {
                             onSelect: { option in
                                 if option == "自定义" {
                                     showCustomDays = true
+                                    customDaysText = "\(days)"
                                 } else if let value = Int(option) {
                                     days = value
                                 }
@@ -340,6 +397,12 @@ struct MainView: View {
                     .disabled(viewModel.running)
                 }
 
+                SkipExistingRow(
+                    checked: viewModel.skipExisting,
+                    enabled: !viewModel.running,
+                    onCheckedChange: { viewModel.setSkipExisting($0) }
+                )
+
                 SectionDivider()
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -362,7 +425,14 @@ struct MainView: View {
         }
     }
 
-    // MARK: - 运行日志
+    // MARK: - 任务日志
+
+    private var logsTab: some View {
+        VStack(spacing: 14) {
+            SemesterCalendar(loggedIn: viewModel.loggedIn, weeks: viewModel.semester.weeks)
+            logSection
+        }
+    }
 
     private var logSection: some View {
         SectionCard(
@@ -387,63 +457,137 @@ struct MainView: View {
         }
     }
 
-    // MARK: - 底部操作栏
+    // MARK: - 底部操作栏与标签栏
 
-    private var bottomBar: some View {
+    @ViewBuilder
+    private var bottomArea: some View {
+        VStack(spacing: 10) {
+            if tab == 0 {
+                actionBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if viewModel.running {
+                // 其他页面只留一条紧凑状态栏，不再占用整条底边。
+                compactRunningBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            LiquidTabBar(selection: $tab, items: navTabs)
+        }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .animation(.snappy(duration: 0.32, extraBounce: 0.06), value: viewModel.running)
+    }
+
+    private var actionBar: some View {
         HStack(spacing: 10) {
             Button {
+                withAnimation(.snappy(duration: 0.34, extraBounce: 0.08)) {
+                    tab = 1
+                }
                 viewModel.previewRoute()
             } label: {
-                Label("预览", systemImage: "map")
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                Image(systemName: "map")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 50, height: 50)
             }
             .buttonStyle(.glass)
             .disabled(viewModel.running)
+            .accessibilityLabel("预览路线")
 
             if viewModel.running {
-                Button(role: .destructive) {
+                Button {
                     viewModel.stopUpload()
                 } label: {
-                    Label("停止任务", systemImage: "stop.fill")
-                        .frame(maxWidth: .infinity, minHeight: 50)
+                    actionLabel(
+                        title: "停止任务",
+                        icon: "stop.fill"
+                    )
                 }
                 .buttonStyle(.glassProminent)
                 .tint(AppTheme.error)
             } else {
                 Button {
-                    startTask()
+                    viewModel.startUpload(config)
                 } label: {
-                    Label("开始任务", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity, minHeight: 50)
+                    actionLabel(
+                        title: "开始任务",
+                        icon: "play.fill"
+                    )
                 }
                 .buttonStyle(.glassProminent)
                 .disabled(viewModel.selectedRoute == nil)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .accessibilityElement(children: .contain)
     }
 
-    // MARK: - 提示条
+    private func actionLabel(title: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 50)
+    }
+
+    private var compactRunningBar: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .stroke(AppTheme.onSurfaceVariant.opacity(0.22), lineWidth: 3)
+                Circle()
+                    .trim(from: 0, to: max(viewModel.progress.fraction, 0.03))
+                    .stroke(AppTheme.error, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(viewModel.progress.status.label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.onSurface)
+                Text("\(viewModel.progress.current)/\(viewModel.progress.total) 次")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(AppTheme.onSurfaceVariant)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(role: .destructive) {
+                viewModel.stopUpload()
+            } label: {
+                Label("停止", systemImage: "stop.fill")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.glass)
+            .tint(AppTheme.error)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .glassEffect(.regular.tint(AppTheme.error.opacity(0.10)), in: Capsule())
+    }
+
+    // MARK: - 浮层提示
 
     @ViewBuilder
-    private var snackbarLayer: some View {
-        if let snackbarMessage {
-            VStack {
-                Spacer()
-                Text(snackbarMessage)
-                    .font(.callout)
-                    .foregroundStyle(AppTheme.onSurface)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .glassEffect(.regular, in: Capsule())
-                    .padding(.bottom, 96)
-            }
-            .transition(.opacity)
-            .task(id: snackbarMessage) {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                withAnimation { self.snackbarMessage = nil }
-            }
+    private var noticeLayer: some View {
+        VStack(spacing: 0) {
+            NoticeOverlay(notice: viewModel.notice)
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+            Spacer(minLength: 0)
+        }
+        .allowsHitTesting(false)
+        // 浮层提示 5 秒后自动收起，和电脑版一样不再往下推内容。
+        .task(id: viewModel.notice?.id) {
+            guard viewModel.notice != nil else { return }
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            withAnimation { viewModel.clearNotice() }
         }
     }
 
@@ -470,11 +614,6 @@ struct MainView: View {
                 viewModel.resolveRouteConflict(decision)
             }
             .zIndex(2)
-        }
-
-        if showAbout {
-            AboutDialog { showAbout = false }
-                .zIndex(3)
         }
 
         if let route = routeToDelete {
@@ -512,16 +651,6 @@ struct MainView: View {
                     .tint(AppTheme.error)
                 }
             }
-        }
-    }
-
-    // MARK: - 行为
-
-    private func startTask() {
-        if let error = viewModel.validate(config) {
-            withAnimation { snackbarMessage = error }
-        } else {
-            viewModel.startUpload(config)
         }
     }
 }
