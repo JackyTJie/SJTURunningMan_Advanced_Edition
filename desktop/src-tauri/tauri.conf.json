@@ -21,7 +21,8 @@
         "resizable": true,
         "fullscreen": false,
         "visible": false,
-        "theme": "Light",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": false,
         "backgroundColor": "#fdfbff"
       }
     ],

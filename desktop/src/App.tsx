@@ -692,6 +692,7 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <div className="titlebar-drag" data-tauri-drag-region />
       {celebration > 0 ? (
         <TaskCelebration key={celebration} onComplete={clearCelebration} />
       ) : null}

@@ -169,6 +169,26 @@ md-linear-progress {
   gap: 6px;
 }
 
+.titlebar-drag {
+  display: none;
+}
+
+:root[data-platform='macos'] .titlebar-drag {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  height: 32px;
+  z-index: 100;
+}
+
+:root[data-platform='macos'] .drawer-inner {
+  padding-top: 52px;
+}
+
+:root[data-platform='macos'] .main-column {
+  padding-top: 32px;
+}
+
 .brand {
   display: flex;
   align-items: center;
