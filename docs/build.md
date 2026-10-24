@@ -24,11 +24,15 @@ pnpm --dir desktop install --frozen-lockfile
 pnpm --dir desktop tauri dev
 ```
 
-需要 Rust 1.95+、Node.js 22+、pnpm 11+，以及对应平台的 Tauri 系统依赖。电脑版使用操作系统 WebView（Windows WebView2 / macOS WKWebView / Linux WebKitGTK），不携带 Chromium、Qt 或 Python。首次启动仍需阅读并勾选使用承诺书。
+需要 Rust 1.95+、Node.js 22+、pnpm 11.22.0，以及对应平台的 Tauri 系统依赖。电脑版使用操作系统 WebView（Windows WebView2 / macOS WKWebView / Linux WebKitGTK），不携带 Chromium、Qt 或 Python。首次启动仍需阅读并勾选使用承诺书。
+
+pnpm 版本由 `desktop/package.json` 的 `packageManager` 固定。本机版本不一致时，即使从仓库根用 `--dir desktop` 调用也会被 pnpm 的版本自检拒绝：Corepack 按当前目录的 `package.json` 选版本，仓库根没有这个文件。用 Corepack 时先执行 `corepack prepare pnpm@11.22.0 --activate`，或先 `cd desktop` 再运行 pnpm 命令。
 
 > `pnpm tauri dev` 会同时启动 Vite（端口 1420）与 Tauri 窗口。直接 `cargo run` 属于 Tauri 开发模式，会连接这个 dev server；单独运行它不会加载前端。生产构建请带 `custom-protocol` feature。
 
 ### 前端与原生构建
+
+命令按行执行：交互式 zsh 默认不把 `#` 当注释，整段粘贴带注释的代码块时，注释文字会被当作参数。
 
 ```bash
 # 使用当前 stable Rust；Cargo.lock 固定全部依赖
@@ -37,23 +41,28 @@ pnpm --dir desktop build            # tsc --noEmit + vite build
 cargo test --workspace --locked
 cargo build --release --locked -p sjturunningman --features custom-protocol
 
-# 或让 Tauri CLI 一次完成前端与打包
+# 或由 Tauri CLI 构建当前架构的安装包；universal2 dmg 见 macOS 一节
 pnpm --dir desktop tauri build
 ```
 
-Windows：安装 Rust 1.95+、Node 22+、pnpm 11+，并准备 MSVC Build Tools 或 MinGW-w64 工具链。运行 `./build_windows.ps1`（会先构建前端）→ `dist/SJTURunningMan.exe`。`.cargo/config.toml` 为 MSVC 配置静态 CRT；本轮实际验证的是 GNU 工具链。用户机器需要 WebView2 Runtime（Windows 10/11 通常已预装）。
+Windows：安装 Rust 1.95+、Node 22+、pnpm 11.22.0，并准备 MSVC Build Tools 或 MinGW-w64 工具链。运行 `./build_windows.ps1`（会先构建前端）→ `dist/SJTURunningMan.exe`。`.cargo/config.toml` 为 MSVC 配置静态 CRT；本轮实际验证的是 GNU 工具链。用户机器需要 WebView2 Runtime（Windows 10/11 通常已预装）。
 
 macOS（需安装 Xcode Command Line Tools）：
 
 ```bash
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
 pnpm --dir desktop build
+cargo test --workspace --locked
 MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target x86_64-apple-darwin
 MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target aarch64-apple-darwin
 mkdir -p dist
 lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
+lipo -archs dist/SJTURunningMan
+rm -rf dist/dmg-stage
 python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 ```
+
+`lipo -archs` 应输出 `x86_64 arm64`。`package_desktop.py` 不会覆盖已有的 `dist/dmg-stage`，重跑前先删除（上面的 `rm -rf` 就是这一步）。产物为 ad-hoc 签名，未公证；`shasum -a 256 dist/SJTURunningMan_*_macOS.dmg` 可记录校验值。
 
 Linux（Ubuntu 24.04，支持 X11 / Wayland）：
 
@@ -88,7 +97,7 @@ Windows exe、macOS universal2 DMG、Linux amd64 / arm64 deb 的构建、打包�
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest（自签名） |
 | `SHA256SUMS.txt` | release 作业汇总生成 |
 
-桌面使用 stable Rust（当前锁定依赖要求 Rust 1.95+）、Node 22+、pnpm 11+ 和 Cargo.lock。两个 deb 构建在 Ubuntu 24.04 上，声明 glibc ≥ 2.39，并依赖 WebKitGTK 4.1 / GTK 3。macOS 通过 lipo 合并两套 Rust 目标；Windows 内嵌现有图标。应用运行不需要 Python。
+桌面使用 stable Rust（当前锁定依赖要求 Rust 1.95+）、Node 22+、pnpm 11.22.0 和 Cargo.lock。两个 deb 构建在 Ubuntu 24.04 上，声明 glibc ≥ 2.39，并依赖 WebKitGTK 4.1 / GTK 3。macOS 通过 lipo 合并两套 Rust 目标；Windows 内嵌现有图标。应用运行不需要 Python。
 
 > **iOS 与鸿蒙 NEXT 不在这个流水线里**，Releases 也不提供它们的预编译包，目前都只手工构建：
 >

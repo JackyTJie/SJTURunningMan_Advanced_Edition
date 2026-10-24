@@ -55,7 +55,7 @@ It contains `settings.json` and `routes/`. Map HTML is served from memory by the
 
 ## Build and verification
 
-Requires Rust 1.95+, Node.js 22+, pnpm 11+ and the Tauri system dependencies (see [build.md](build.md)).
+Requires Rust 1.95+, Node.js 22+, pnpm 11.22.0 (pinned by `packageManager` in `desktop/package.json`) and the Tauri system dependencies (see [build.md](build.md)).
 
 ```bash
 pnpm --dir desktop install --frozen-lockfile

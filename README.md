@@ -88,7 +88,7 @@ pnpm --dir desktop install --frozen-lockfile
 pnpm --dir desktop tauri dev
 ```
 
-需要 Rust 1.95+、Node.js 22+、pnpm 11+ 和对应平台的 Tauri 系统依赖；Linux 还要装 `libwebkit2gtk-4.1-dev`、`libgtk-3-dev` 等。生产构建用 `cargo build --release --locked -p sjturunningman --features custom-protocol`，或 `pnpm --dir desktop tauri build`。各平台的完整步骤、测试与打包命令见 [docs/build.md](docs/build.md)。
+需要 Rust 1.95+、Node.js 22+、pnpm 11.22.0（版本由 `desktop/package.json` 的 `packageManager` 固定）和对应平台的 Tauri 系统依赖；Linux 还要装 `libwebkit2gtk-4.1-dev`、`libgtk-3-dev` 等。生产构建用 `cargo build --release --locked -p sjturunningman --features custom-protocol`，或 `pnpm --dir desktop tauri build`（当前架构；universal2 dmg 见 build.md）。各平台的完整步骤、测试与打包命令见 [docs/build.md](docs/build.md)。
 
 ## 文档导航
 
