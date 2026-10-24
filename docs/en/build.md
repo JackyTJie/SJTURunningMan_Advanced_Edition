@@ -24,11 +24,15 @@ pnpm --dir desktop install --frozen-lockfile
 pnpm --dir desktop tauri dev
 ```
 
-Requires Rust 1.95+, Node.js 22+, pnpm 11+ and the Tauri system dependencies for your OS. The desktop client uses the system WebView (WebView2 / WKWebView / WebKitGTK) and bundles no Chromium, Qt or Python. The first launch still requires accepting the usage pledge.
+Requires Rust 1.95+, Node.js 22+, pnpm 11.22.0 and the Tauri system dependencies for your OS. The desktop client uses the system WebView (WebView2 / WKWebView / WebKitGTK) and bundles no Chromium, Qt or Python. The first launch still requires accepting the usage pledge.
+
+The pnpm version is pinned by `packageManager` in `desktop/package.json`. A different local version is rejected by pnpm's version check even when `--dir desktop` is used from the repository root: Corepack reads the `package.json` in the current directory, and the repository root has none. With Corepack, run `corepack prepare pnpm@11.22.0 --activate` first, or `cd desktop` and run pnpm there.
 
 > `pnpm tauri dev` starts both Vite on port 1420 and the Tauri window. A bare `cargo run` is a Tauri development build that expects that dev server; production builds must enable `custom-protocol`.
 
 ### Native desktop and frontend
+
+Run these commands line by line: interactive zsh does not treat `#` as a comment by default, so a block pasted as a whole turns comment text into arguments.
 
 ```bash
 pnpm --dir desktop install --frozen-lockfile
@@ -36,23 +40,28 @@ pnpm --dir desktop build            # tsc --noEmit + vite build
 cargo test --workspace --locked
 cargo build --release --locked -p sjturunningman --features custom-protocol
 
-# Or let the Tauri CLI build both the frontend and the bundle
+# Or let the Tauri CLI build a bundle for the current architecture; universal2 dmg below
 pnpm --dir desktop tauri build
 ```
 
-Windows: install Rust 1.95+, Node 22+, pnpm 11+ plus MSVC Build Tools or MinGW-w64. `./build_windows.ps1` builds the frontend first and creates `dist/SJTURunningMan.exe`. The MSVC target uses static CRT via `.cargo/config.toml`; this session tested the GNU toolchain. End users need the WebView2 Runtime (preinstalled on most Windows 10/11 systems).
+Windows: install Rust 1.95+, Node 22+, pnpm 11.22.0 plus MSVC Build Tools or MinGW-w64. `./build_windows.ps1` builds the frontend first and creates `dist/SJTURunningMan.exe`. The MSVC target uses static CRT via `.cargo/config.toml`; this session tested the GNU toolchain. End users need the WebView2 Runtime (preinstalled on most Windows 10/11 systems).
 
 macOS (Xcode command line tools required):
 
 ```bash
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
 pnpm --dir desktop build
+cargo test --workspace --locked
 MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target x86_64-apple-darwin
 MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --locked --features custom-protocol --target aarch64-apple-darwin
 mkdir -p dist
 lipo -create target/x86_64-apple-darwin/release/sjturunningman target/aarch64-apple-darwin/release/sjturunningman -output dist/SJTURunningMan
+lipo -archs dist/SJTURunningMan
+rm -rf dist/dmg-stage
 python3 scripts/package_desktop.py macos --binary dist/SJTURunningMan
 ```
+
+`lipo -archs` must print `x86_64 arm64`. `package_desktop.py` refuses to overwrite an existing `dist/dmg-stage`; the `rm -rf` above clears it for reruns. The dmg is ad-hoc signed and not notarized; record it with `shasum -a 256 dist/SJTURunningMan_*_macOS.dmg`.
 
 Linux (Ubuntu 24.04, X11 / Wayland):
 
@@ -87,7 +96,7 @@ The Windows exe, macOS universal2 DMG, and Linux amd64/arm64 debs are built, ver
 | `SJTURunningMan_<ver>_android.apk` | ubuntu-latest (self-signed) |
 | `SHA256SUMS.txt` | generated in the release job |
 
-Desktop builds use stable Rust with Cargo.lock. Both debs are built on Ubuntu 24.04 and declare glibc ≥ 2.39. macOS builds combine two Rust targets with lipo; Windows builds embed the existing icon. The app has no Python runtime dependency.
+Desktop builds use stable Rust, Node 22+ and pnpm 11.22.0 with Cargo.lock. Both debs are built on Ubuntu 24.04 and declare glibc ≥ 2.39. macOS builds combine two Rust targets with lipo; Windows builds embed the existing icon. The app has no Python runtime dependency.
 
 > **iOS and HarmonyOS NEXT are not part of this pipeline**, and Releases ships no prebuilt packages for them — both are built by hand today:
 >

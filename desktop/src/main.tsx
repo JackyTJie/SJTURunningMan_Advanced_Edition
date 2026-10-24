@@ -28,6 +28,10 @@ import './styles/tokens.css';
 import './styles/global.css';
 import { App } from './App';
 
+if ('__TAURI_INTERNALS__' in window && navigator.userAgent.includes('Macintosh')) {
+  document.documentElement.dataset.platform = 'macos';
+}
+
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root');
 createRoot(container).render(<App />);

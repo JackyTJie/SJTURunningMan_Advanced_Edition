@@ -57,7 +57,7 @@
 
 ## 构建与验证
 
-需要 Rust 1.95+、Node.js 22+、pnpm 11+，以及对应平台的 Tauri 系统依赖（见 [build.md](build.md)）。
+需要 Rust 1.95+、Node.js 22+、pnpm 11.22.0（由 `desktop/package.json` 的 `packageManager` 固定），以及对应平台的 Tauri 系统依赖（见 [build.md](build.md)）。
 
 ```bash
 pnpm --dir desktop install --frozen-lockfile
