@@ -86,7 +86,7 @@ fun AboutPanel(modifier: Modifier = Modifier) {
             )
             SectionDivider()
             Text(
-                "界面优化：Github@CEQ151\n三改：Github@JackyTJie\n二改：Github@accelerator-s\n原作者：Github@Labyrinth0419",
+                "三改：Github@JackyTJie\n二改：Github@accelerator-s\n原作者：Github@Labyrinth0419",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

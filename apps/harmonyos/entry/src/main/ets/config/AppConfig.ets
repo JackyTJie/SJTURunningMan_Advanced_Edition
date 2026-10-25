@@ -51,7 +51,7 @@ export class AppConfig {
       '4. 我承诺不会将本软件用于伪造运动数据、规避体育锻炼要求或其他违规操作。';
 
   /** 作者署名（关于页） */
-  static readonly CREDITS: string = '界面优化：Github@CEQ151\n三改：Github@JackyTJie\n二改：Github@accelerator-s\n原作者：Github@Labyrinth0419';
+  static readonly CREDITS: string = '三改：Github@JackyTJie\n二改：Github@accelerator-s\n原作者：Github@Labyrinth0419';
 
   /**
    * 鸿蒙端维护者署名。
