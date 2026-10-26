@@ -19,6 +19,7 @@ The HarmonyOS build was contributed by [@AetherWish](https://github.com/AetherWi
 - [7. Differences from other platforms](#7-differences-from-other-platforms)
 - [8. Known ArkTS toolchain traps](#8-known-arkts-toolchain-traps)
 - [9. Route length and preview limits](#9-route-length-and-preview-limits)
+- [10. Semester progress, calendar and auto plan](#10-semester-progress-calendar-and-auto-plan)
 
 ## 1. Installing the HAP
 
@@ -39,13 +40,14 @@ The HarmonyOS build was contributed by [@AetherWish](https://github.com/AetherWi
 
 ## 3. Parameters
 
-The main screen has **no bottom tab bar**: the title ("开润") sits on the same row as the **account** and **about** icon buttons in the top-right corner (`HdsNavigation` MINI title mode). The "开润" page shows the status card, the route card, the task settings cards and the run log, from top to bottom.
+The main screen has **no bottom tab bar**: the title ("开润") sits on the same row as the **semester calendar**, **account** and **about** icon buttons in the top-right corner (self-drawn title bar, see section 8). The "开润" page shows the status card, the semester progress card, the route card, the task settings cards and the run log, from top to bottom.
 
 | Parameter | Range | Default | Notes |
 | --- | --- | --- | --- |
 | Runs | 1–30 | 1 | Dropdown with 1/3/5/7/10/15/30, or "自定义…" to type a number (the control then reads 自定义) |
 | Start time | hour 0–23 / minute 0–59 / second 0–59 (i.e. 00:00:00–23:59:59) | 08:00:00 | Tapping opens the system time picker (24-hour, three columns); each record gets a random **±10 min / ±30 s** jitter (the explanation is folded behind the ⓘ icon next to the label) |
 | End date | Date picker | Yesterday | Records are generated backwards from this date; tapping the whole row opens the picker |
+| Skip days with records | on / off | on | Still uploads the configured number of runs, but moves the days that already have a record to **earlier** dates; skipped dates are logged, and when the 120-day cap or the semester start is hit the log says only N dates could be used |
 | Distance | 1–5 km | 4 km | Per-record target distance, slider step 0.1 km; the value sits on the same line as the "目标距离" label, immediately to its right (`目标距离 4.0 km`) |
 | Route | See below | 思源湖路线 | Dropdown; design a new one on a separate page |
 
@@ -92,7 +94,7 @@ HarmonyOS **does not read location or phone state**: tracks are interpolated off
 | One-tap login | Yes | No, JAccount web login only |
 | Permissions | INTERNET / ACCESS_NETWORK_STATE / READ_PHONE_STATE | INTERNET / GET_NETWORK_INFO |
 | Parameters | 1–30 runs / 1–5 km | Same as Android |
-| UI toolkit | Material 3 (Compose) | HarmonyOS Design components + immersive material |
+| UI toolkit | Material 3 (Compose) | Plain ArkUI (`Navigation` / `NavDestination` plus self-drawn cards, see section 8) |
 | Route asset | `route_design.html` (Baidu Maps) | Same asset, stored separately (the bridge object is still named `AndroidInterface`) |
 | About / updates | Dialog | Dedicated "About" page |
 | Route preview colours | Material theme colours | Fixed blue/orange palette matching the map (`RoutePreviewCanvas.ets`) |
@@ -103,6 +105,20 @@ Building and packaging: [build.md](./build.md). Coordinate systems: [routes.md](
 ## 8. Known ArkTS toolchain traps
 
 These compile fine and only fail at runtime on a device, so keep them in mind when changing the UI.
+
+**The UI uses plain ArkUI only and does not depend on the UI Design Kit (HDS).** The earlier implementation
+rendered an "immersive material" title bar through `HdsNavigation` / `HdsNavDestination` / `hdsMaterial` from
+`@kit.UIDesignKit` and `uiMaterial.ImmersiveMaterial` from `@kit.ArkUI`. Those APIs **only exist in SDKs newer
+than HarmonyOS 6.0.1 (API 21)**: building against the API 21 SDK fails outright with
+`'uiMaterial' is not exported from Kit '@kit.ArkUI'`, `'hdsMaterial' is not exported from Kit '@kit.UIDesignKit'`
+and `Cannot find name 'HdsNavigationAttribute'`. The app now uses native `Navigation` + `NavDestination`
+(`pages/Index.ets` draws its own title bar, `APP_HEADER_HEIGHT` lives in `view/CommonComponents.ets`), and the
+log panel gets a similar frosted look from `backgroundBlurStyle(BlurStyle.Thin)` over a translucent background.
+
+To bring the immersive material back, upgrade DevEco Studio / the SDK to a version that ships the UI Design Kit,
+write `compileSdkVersion` / `targetSdkVersion` in `build-profile.json5` as `'x.y.z(API level)'` (for example
+`'6.0.1(21)'`) and bump them to the new version, and add the `ohos.arkui.UIMaterial.state` metadata back to
+`module.json5`.
 
 **Never put a custom component directly inside an arrow function passed to an external component.** The ArkTS
 compiler only rewrites `Foo({...})` into `new Foo(this, {...})` when the call sits in a declarative-UI context.
@@ -124,7 +140,7 @@ DistanceSliderBuilder() {
 > `entry/build/default/cache/default/default@CompileArkTS/esmodule/debug/` and confirm the component became
 > `new Foo(this, {...})`. A bare `Foo({...})` call there will always crash.
 
-**A custom suffix on an HDS card does not take part in size measurement.** `HdsListItemCard`'s `suffixItem`
+**(Historical) A custom suffix on an HDS card does not take part in size measurement.** HDS is no longer a dependency, but these measurements explain where `SettingCard`'s dimensions come from, so they are worth reading before changing the cards. `HdsListItemCard`'s `suffixItem`
 accepts only a `SuffixCustomBuilder`, and that suffix contributes neither to the card's width allocation nor to
 its height measurement. Measured: with eight option chips in the suffix, the card stayed 64vp tall (the fixed
 `SuffixText` line height) while the `Flex` inside wrapped against the *screen* width and grew upwards, drawing
@@ -201,3 +217,32 @@ non-finite values) and report the reason in the log, for example:
 >
 > That check and the `MAX_EXPANSION_POINTS` cap from section 9 are both **safety nets**: they never trigger
 > with a valid configuration and only downgrade a future unit/order mistake from a crash to a log error.
+
+## 10. Semester progress, calendar and auto plan
+
+All three come from read-only Sports Department endpoints (`semesterStats()` in `service/ApiService.ets`). They only need the `pe.sjtu.edu.cn` session cookie, not the token used for uploading.
+
+**Semester progress card** (below the status card) shows two numbers: passed kilometres (`resultKm`, two decimals) and completion rate (the server's `percent` is already 0–100; when it is missing the app falls back to passed / total). Both read `--` when logged out or when the request fails.
+
+**Semester calendar** (calendar icon in the top-right corner) expands the whole semester month by month, weeks starting on Monday:
+
+| Style | Meaning |
+| --- | --- |
+| Solid green | Counts towards the score (server `state == "0"`) |
+| Outlined | Has a record but does not count (`state` 12/13 etc.) |
+| Grey | No record in the range |
+| Blank cell | Padding at the start/end of a month, or outside the semester range |
+
+Logged out, the app shows a **placeholder calendar** guessed from the current month (Jan–Feb → previous academic year's autumn, Mar–Jul → spring, otherwise autumn), all cells "not run". When the server omits the start/end dates (`semesterDateList` missing) the calendar keeps the placeholder and the log says `服务器未返回本学期起止日期，日历保持占位`.
+
+**Auto plan** runs once, **right after a successful login**: it turns the gap (`target − passed`) into runs × per-run distance — first spreading the gap over the 5 km per-run cap (at most 30 runs), then distributing it so every run is rounded up to 0.01 km, which guarantees the batch covers the gap. A 21 km gap, for example, becomes 5 runs × 4.2 km.
+
+When it applies:
+
+1. the 跑步次数 and 目标距离 inputs on the home page are rewritten (the custom-runs input collapses) and a toast reads `已按本学期未完成 X km 自动设为 N 次 × D km`;
+2. the result is persisted under `app_prefs/plan_auto_days` / `plan_auto_distance` / `plan_auto_active`, so the next launch fills the inputs from it again;
+3. **manual edits win**: once you change runs or distance the app stops overwriting them (the test is "still the defaults 1 × 4 km" or "equal to the last auto plan") and logs `跑步次数 / 单次距离已被手动修改，保持你的设置`.
+
+A successful upload refreshes the semester data (the calendar follows) but **does not** trigger the auto plan again. Switching accounts or losing the cookie resets the calendar to the placeholder first, and late responses are dropped by a session serial.
+
+> The "skip days with records" switch uses exactly these dates: any day with a record — counted or not — is skipped. The semester start date also bounds the backwards search.

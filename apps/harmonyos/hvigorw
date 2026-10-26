@@ -72,6 +72,13 @@ if [ -n "${DEVECO_SDK_HOME}" ]; then
 	fi
 fi
 
+# The variables above are plain shell variables; the hvigor wrapper runs as a
+# child process and only sees exported ones. Without these exports
+# hvigorw.js falls back to "$(dirname hvigorw.js)/.." (i.e. apps/harmonyos)
+# and fails with ENOENT looking for
+# "<cache>/workspace/node_modules/@ohos/hvigor/bin/hvigor.js".
+export DEVECO_SDK_HOME NODE_HOME HVIGOR_TOOLS_HOME
+
 # Determine node to start hvigor wrapper script
 if [ -n "${NODE_HOME}" ];then
    # unix path

@@ -1,19 +1,18 @@
 import { promptAction } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
-import { HdsNavDestination } from '@kit.UIDesignKit';
 import { GpsPoint } from '../model/RouteInfo';
 import { RouteManager } from '../service/RouteManager';
 import { MainViewModel } from '../viewmodel/MainViewModel';
 import { LogLevel } from '../viewmodel/TaskModels';
 
 /**
- * 路线设计页（二级页，挂载于 Index 的 HdsNavigation 导航栈）
+ * 路线设计页（二级页，挂载于 Index 的 Navigation 导航栈）
  * 迁移自 Android: com.sjtu.runner.route.RouteDesignActivity
  * - WebView(assets/route_design.html) -> Web($rawfile('route_design.html'))
  * - addJavascriptInterface(AndroidBridge, "AndroidInterface") -> javaScriptProxy(同名桥)
  *   HTML 内调用 window.AndroidInterface.onSaveRoute(name, pointsJson) 的逻辑无需改动。
  * - setResult(RESULT_OK) + finish() -> 通知 ViewModel 刷新路线列表 + navStack.pop()
- * - 自绘顶栏/返回键 -> HdsNavDestination 原生标题栏与系统返回控件
+ * - 自绘顶栏/返回键 -> NavDestination 原生标题栏与系统返回控件
  */
 class RouteBridge {
   private owner: RouteDesignPage | null = null;
@@ -94,7 +93,7 @@ export struct RouteDesignPage {
   }
 
   build() {
-    HdsNavDestination() {
+    NavDestination() {
       Web({ src: $rawfile('route_design.html'), controller: this.controller })
         .javaScriptAccess(true)
         .domStorageAccess(true)
@@ -108,12 +107,6 @@ export struct RouteDesignPage {
           controller: this.controller
         })
     }
-    .titleBar({
-      content: {
-        title: {
-          mainTitle: '设计路线'
-        }
-      }
-    })
+    .title('设计路线')
   }
 }

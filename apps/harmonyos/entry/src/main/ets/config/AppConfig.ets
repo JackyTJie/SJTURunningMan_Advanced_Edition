@@ -17,6 +17,14 @@ export class AppConfig {
   static readonly MY_DATA_URL: string = 'https://pe.sjtu.edu.cn/sports/my/data';
   static readonly POINT_RULE_URL: string = 'https://pe.sjtu.edu.cn/api/running/point-rule';
   static readonly UPLOAD_URL: string = 'https://pe.sjtu.edu.cn/api/running/result/upload';
+  /** 本学期目标公里数（只读学期统计的一部分，失败不阻塞其它数据） */
+  static readonly SEMESTER_TARGET_URL: string = 'https://pe.sjtu.edu.cn/sports/my/semesterTarget';
+  /** 学期列表（取当前学期 id 与名称） */
+  static readonly SEMESTER_LIST_URL: string = 'https://pe.sjtu.edu.cn/sports/running/semester/list';
+  /** 用户信息（学期起止日期在 semesterDateList 里，需要 POST 空 JSON） */
+  static readonly USER_INFO_URL: string = 'https://pe.sjtu.edu.cn/sports/ranking/getUserInfo';
+  /** 跑步记录列表（按学期 id 拉取，用于学期日历的每日状态） */
+  static readonly RESULT_LIST_URL: string = 'https://pe.sjtu.edu.cn/sports/running/result/list';
 
   /** 跑步次数上限（与 Android/iOS 共享常量一致） */
   static readonly MAX_RUN_TIMES: number = 30;

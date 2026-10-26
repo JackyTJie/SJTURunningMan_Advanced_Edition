@@ -1,4 +1,6 @@
 import { common } from '@kit.AbilityKit';
+import { preferences } from '@kit.ArkData';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { RouteInfo, GpsPoint } from '../model/RouteInfo';
 import { ApiService } from '../service/ApiService';
 import { RouteManager } from '../service/RouteManager';
@@ -7,6 +9,20 @@ import { CookieService } from '../service/CookieService';
 import { DataGenerator } from '../service/DataGenerator';
 import { AppConfig } from '../config/AppConfig';
 import { parseDate, yesterday, pad2, randomInt } from '../utils/FormatUtil';
+import {
+  AutoPlan,
+  CalendarWeek,
+  DayState,
+  SemesterStats,
+  autoPlan,
+  calendarWeeks,
+  formatKm,
+  formatPercent,
+  formatPlanKm,
+  placeholderWeeks,
+  todayCst
+} from '../service/SemesterStats';
+import { RunSchedule, buildSchedule, formatSkippedDays } from '../service/RunSchedule';
 import {
   LogLevel,
   LogEntry,
@@ -46,6 +62,48 @@ export class RunConfig {
   }
 }
 
+/** 偏好设置（与 Index.ets 的承诺书标记同一个 preferences 文件名） */
+const PREFS_NAME: string = 'app_prefs';
+/** 跳过已有记录的日期（等价 Android KEY_SKIP_EXISTING） */
+const KEY_SKIP_EXISTING: string = 'skip_existing';
+/** 自动排计划是否生效 / 上次生效的次数与距离（跨启动保留，等价 Android 的四个 KEY_PLAN_AUTO_*） */
+const KEY_PLAN_AUTO_ACTIVE: string = 'plan_auto_active';
+const KEY_PLAN_AUTO_DAYS: string = 'plan_auto_days';
+const KEY_PLAN_AUTO_DISTANCE: string = 'plan_auto_distance';
+
+const LOG_DOMAIN: number = 0x0000;
+const LOG_TAG: string = 'MainViewModel';
+
+/**
+ * 自动排计划的一次生效记录。
+ * token 保证「同样的次数 × 距离」也能被界面重新应用（值相同但对象不同，@Trace 才会触发刷新）。
+ */
+export class AutoPlanApplied {
+  runs: number;
+  distanceKm: number;
+  token: number;
+  /** 提示文案（启动时从偏好恢复的那次没有提示，为空串） */
+  message: string;
+
+  constructor(runs: number, distanceKm: number, token: number, message: string) {
+    this.runs = runs;
+    this.distanceKm = distanceKm;
+    this.token = token;
+    this.message = message;
+  }
+}
+
+/** 异常 -> 可读文案（不做类型断言，普通 Error 也能取到 message） */
+function errorText(e: Object): string {
+  if (typeof e === 'object' && e !== null) {
+    const message = (e as Record<string, Object>)['message'];
+    if (typeof message === 'string' && (message as string).length > 0) {
+      return message as string;
+    }
+  }
+  return '未知错误';
+}
+
 /**
  * 主界面 ViewModel
  * 迁移自 Android: com.sjtu.runner.viewmodel.MainViewModel
@@ -69,6 +127,16 @@ export class MainViewModel {
   @Trace reloginRequired: boolean = false;
   /** 登录状态（由 CookieService 检测，供界面响应式刷新） */
   @Trace loginState: boolean = false;
+  /** 本学期达标公里文本（未登录 / 缺失时为 `--`） */
+  @Trace semesterKmText: string = '--';
+  /** 本学期完成率文本（服务器已是百分数） */
+  @Trace semesterPercentText: string = '--';
+  /** 学期日历的周行（未登录时为按月份推断的占位日历） */
+  @Trace semesterWeeks: CalendarWeek[] = placeholderWeeks(todayCst());
+  /** 是否跳过已有记录的日期（默认开启，持久化在 app_prefs/skip_existing） */
+  @Trace skipExisting: boolean = true;
+  /** 最近一次自动排计划的结果（界面据此改写次数与距离） */
+  @Trace autoPlanApplied: AutoPlanApplied | undefined = undefined;
 
   /** 触发重新登录时的回调（等价 MainActivity 设置的 onReloginRequired） */
   onReloginRequired: (() => void) | null = null;
@@ -76,6 +144,10 @@ export class MainViewModel {
   onLogAppended: (() => void) | null = null;
   /** 路线冲突挂起时的回调（界面据此弹出“路线距离提醒”） */
   onRouteConflict: (() => void) | null = null;
+  /** 自动排计划生效时的回调：界面据此把次数与单次距离写回输入控件 */
+  onAutoPlanApplied: ((runs: number, distanceKm: number) => void) | null = null;
+  /** 需要浮层提示时回调（等价 Android 的 Notice 浮层；ArkTS 端由界面弹 toast） */
+  onNotice: ((message: string) => void) | null = null;
   /** 当前生效的任务配置（等价 Android currentConfig） */
   currentConfig: RunConfig | undefined = undefined;
 
@@ -85,6 +157,14 @@ export class MainViewModel {
   private successCount: number = 0;
   private failCount: number = 0;
   private context: common.Context | undefined = undefined;
+  /** 最近一次成功的学期数据，用于「跳过已有记录的日期」与自动排计划 */
+  private stats: SemesterStats | undefined = undefined;
+  /** 换账号 / 重新登录后递增，迟到的统计响应据此丢弃 */
+  private sessionSerial: number = 0;
+  /** 登录后第一次拿到学期数据时才按缺口调整计划 */
+  private autoAdjustPending: boolean = false;
+  private autoPlanToken: number = 0;
+  private lastAppliedPlan: AutoPlan | undefined = undefined;
 
   private static instance: MainViewModel | null = null;
 
@@ -117,6 +197,12 @@ export class MainViewModel {
     this.context = context;
     this.routeManager.init(context);
     this.loadRoutes();
+    // 恢复偏好（跳过已有记录 + 上次自动排的结果），再按登录态拉一次学期数据
+    this.restorePrefs();
+    this.refreshLoginState();
+    if (this.loginState) {
+      this.refreshSemesterStats();
+    }
   }
 
   loadRoutes(): void {
@@ -197,6 +283,206 @@ export class MainViewModel {
       return this.routeManager.readDefaultRouteCoordinates();
     }
     return points;
+  }
+
+  // ==================== 学期统计 / 自动排计划 ====================
+
+  /**
+   * 登录页返回成功后调用：换会话、拉学期数据，并允许按缺口调整计划。
+   * 等价 Android MainViewModel.onLoginSucceeded()
+   */
+  onLoginSucceeded(): void {
+    this.sessionSerial += 1;
+    this.autoAdjustPending = true;
+    this.reloginRequired = false;
+    this.loginState = true;
+    this.refreshSemesterStats();
+  }
+
+  /**
+   * 拉取本学期统计（达标公里 / 完成率 / 目标 / 起止日期 / 每日打卡状态）。
+   * 等价 Android refreshSemesterStats()：迟到的响应按 sessionSerial 丢弃。
+   */
+  refreshSemesterStats(): void {
+    const serial: number = this.sessionSerial;
+    this.api.semesterStats().then((data: SemesterStats) => {
+      if (serial !== this.sessionSerial) {
+        return;
+      }
+      this.applyStats(data);
+    }).catch((e: Object) => {
+      if (serial !== this.sessionSerial) {
+        return;
+      }
+      this.autoAdjustPending = false;
+      this.logMsg(LogLevel.ERROR, `学期数据同步失败：${errorText(e)}`);
+    });
+  }
+
+  /** 把一次成功的学期统计落到界面状态，并在需要时触发自动排计划 */
+  private applyStats(data: SemesterStats): void {
+    this.stats = data;
+    this.semesterKmText = formatKm(data.resultKm);
+    this.semesterPercentText = formatPercent(data.percent);
+    let weeks: CalendarWeek[] | undefined = undefined;
+    if (data.range !== undefined) {
+      weeks = calendarWeeks(data.range, data.runDays);
+      this.semesterWeeks = weeks;
+    } else {
+      this.semesterWeeks = placeholderWeeks(todayCst());
+    }
+    if (weeks !== undefined) {
+      this.logMsg(LogLevel.INFO, `学期数据已同步 · ${data.runDays.size} 天有记录`);
+    } else {
+      this.logMsg(LogLevel.INFO, '服务器未返回本学期起止日期，日历保持占位');
+    }
+    if (this.autoAdjustPending) {
+      this.autoAdjustPending = false;
+      this.autoAdjustPlan(data);
+    }
+  }
+
+  /**
+   * 登录后的第一次学期数据用来按本学期缺口反推「次数 × 单次距离」。
+   * 用户手动改过设置时保持他的手改结果（与电脑版 / 安卓版一致）。
+   */
+  private autoAdjustPlan(data: SemesterStats): void {
+    const target = data.targetKm;
+    const done = data.resultKm;
+    if (target === undefined || !Number.isFinite(target) || done === undefined || !Number.isFinite(done)) {
+      this.logMsg(LogLevel.INFO, '服务器未返回本学期目标或已完成公里数，跑步计划保持不变');
+      return;
+    }
+    const remaining = target - done;
+    const plan = autoPlan(remaining);
+    if (plan === undefined) {
+      this.logMsg(LogLevel.INFO, '本学期没有待补的公里数，跑步计划保持不变');
+      return;
+    }
+    const config = this.currentConfig;
+    const isDefaultPlan = config === undefined
+      || (config.days === 1 && config.distanceKm === AppConfig.DEFAULT_DISTANCE_KM);
+    const lastPlan = this.lastAppliedPlan;
+    const isLastPlan = lastPlan !== undefined && config !== undefined
+      && lastPlan.runs === config.days && lastPlan.distanceKm === config.distanceKm;
+    if (!isDefaultPlan && !isLastPlan) {
+      this.logMsg(LogLevel.INFO, '跑步次数 / 单次距离已被手动修改，保持你的设置');
+      return;
+    }
+    this.lastAppliedPlan = plan;
+    this.persistAutoPlan(plan);
+    // 次数和距离都变了，上一条预览不再对应当前参数
+    this.preview = undefined;
+    this.autoPlanToken += 1;
+    const message = `已按本学期未完成 ${formatKm(remaining)} 自动设为 ${plan.runs} 次 × `
+      + `${formatPlanKm(plan.distanceKm)} km`;
+    this.autoPlanApplied = new AutoPlanApplied(plan.runs, plan.distanceKm, this.autoPlanToken, message);
+    this.notify(message);
+    if (this.onAutoPlanApplied !== null) {
+      this.onAutoPlanApplied(plan.runs, plan.distanceKm);
+    }
+  }
+
+  /** 未登录 / 会话失效 / 退出账号时把学期数据打回占位（进度 `--`、日历按月份推断） */
+  clearSemesterView(): void {
+    this.stats = undefined;
+    this.autoAdjustPending = false;
+    this.semesterKmText = '--';
+    this.semesterPercentText = '--';
+    this.semesterWeeks = placeholderWeeks(todayCst());
+  }
+
+  /** 切换「跳过已有记录的日期」并持久化（等价 Android setSkipExisting） */
+  setSkipExisting(value: boolean): void {
+    this.skipExisting = value;
+    const store = this.prefs();
+    if (store === undefined) {
+      return;
+    }
+    try {
+      store.putSync(KEY_SKIP_EXISTING, value);
+      store.flushSync();
+    } catch (e) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'persist skip_existing failed: %{public}s', errorText(e as Object));
+    }
+  }
+
+  /** 本学期已有记录的日期键集合（供 buildSchedule 跳过） */
+  private occupiedDays(): Set<string> {
+    const occupied: Set<string> = new Set<string>();
+    const stats = this.stats;
+    if (stats !== undefined) {
+      stats.runDays.forEach((state: DayState, key: string) => {
+        occupied.add(key);
+      });
+    }
+    return occupied;
+  }
+
+  private prefs(): preferences.Preferences | undefined {
+    if (this.context === undefined) {
+      return undefined;
+    }
+    try {
+      return preferences.getPreferencesSync(this.context, { name: PREFS_NAME });
+    } catch (e) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'open preferences failed: %{public}s', errorText(e as Object));
+      return undefined;
+    }
+  }
+
+  private persistAutoPlan(plan: AutoPlan): void {
+    const store = this.prefs();
+    if (store === undefined) {
+      return;
+    }
+    try {
+      store.putSync(KEY_PLAN_AUTO_DAYS, plan.runs);
+      store.putSync(KEY_PLAN_AUTO_DISTANCE, formatPlanKm(plan.distanceKm));
+      store.putSync(KEY_PLAN_AUTO_ACTIVE, true);
+      store.flushSync();
+    } catch (e) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'persist auto plan failed: %{public}s', errorText(e as Object));
+    }
+  }
+
+  /** 恢复「跳过已有记录」与上次自动排的结果（等价 Android restorePrefs） */
+  private restorePrefs(): void {
+    const store = this.prefs();
+    if (store === undefined) {
+      return;
+    }
+    try {
+      const skip = store.getSync(KEY_SKIP_EXISTING, true);
+      if (typeof skip === 'boolean') {
+        this.skipExisting = skip as boolean;
+      }
+      const active = store.getSync(KEY_PLAN_AUTO_ACTIVE, false);
+      if (active !== true) {
+        return;
+      }
+      const runsValue = store.getSync(KEY_PLAN_AUTO_DAYS, 0);
+      const distanceValue = store.getSync(KEY_PLAN_AUTO_DISTANCE, '');
+      const runs = typeof runsValue === 'number' ? runsValue as number : 0;
+      const distanceText = typeof distanceValue === 'string' ? distanceValue as string : '';
+      const distance = Number(distanceText);
+      if (runs >= 1 && runs <= AppConfig.MAX_RUN_TIMES && distanceText.length > 0 && Number.isFinite(distance)) {
+        this.lastAppliedPlan = new AutoPlan(runs, distance);
+        this.autoPlanToken += 1;
+        // 启动恢复不弹提示，只把参数摆好（界面在 aboutToAppear 里读取并套用）
+        this.autoPlanApplied = new AutoPlanApplied(runs, distance, this.autoPlanToken, '');
+      }
+    } catch (e) {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'restore prefs failed: %{public}s', errorText(e as Object));
+    }
+  }
+
+  /** 浮层提示 + 日志各一份（等价 Android notify：不会只留一处） */
+  private notify(message: string): void {
+    this.logMsg(LogLevel.INFO, message);
+    if (this.onNotice !== null) {
+      this.onNotice(message);
+    }
   }
 
   // ==================== 日志 ====================
@@ -340,7 +626,16 @@ export class MainViewModel {
     this.failCount = 0;
     this.reloginRequired = false;
 
-    const days = config.days;
+    // 上传前先决定这批记录落在哪些日期：已有记录的那几天挪到更早的日期。
+    const stats = this.stats;
+    const earliest = stats !== undefined && stats.range !== undefined ? stats.range.start : undefined;
+    const schedule: RunSchedule = buildSchedule(config.startDate, config.days, this.skipExisting,
+      this.occupiedDays(), earliest);
+    if (schedule.dates.length === 0) {
+      this.notify('设定次数内的日期都已有记录，可关闭「跳过已有记录的日期」或改用更早的结束日期');
+      return;
+    }
+    const days = schedule.dates.length;
     const targetDistanceM = config.distanceKm * 1000.0;
 
     try {
@@ -349,6 +644,14 @@ export class MainViewModel {
       const route = this.selectedRoute;
       const routeName = route !== undefined ? route.name : '未知路线';
       this.logMsg(LogLevel.INFO, `使用路线: ${routeName}`);
+      const skippedText = formatSkippedDays(schedule.skipped);
+      if (skippedText.length > 0) {
+        this.logMsg(LogLevel.INFO, skippedText);
+      }
+      if (schedule.truncated) {
+        this.logMsg(LogLevel.INFO,
+          `向前查找已到头，只找到 ${days} 个可上传的日期（设定 ${config.days} 次）`);
+      }
       this.logMsg(LogLevel.INFO, '步骤 1/2: 获取认证...');
       if (coordinates.length < 2) {
         this.logMsg(LogLevel.ERROR, '路线坐标为空，请选择其他路线');
@@ -378,7 +681,7 @@ export class MainViewModel {
           break;
         }
 
-        const startTimeMs = this.baseStartDateTimeMs(config, i);
+        const startTimeMs = this.baseStartDateTimeMs(config, schedule.dates[i]);
         this.logMsg(LogLevel.INFO,
           `生成第 ${i + 1}/${days} 条数据 (${MainViewModel.formatDateTime(startTimeMs)})`);
         this.progress = new TaskProgress(i, days, TaskStatus.GENERATING);
@@ -429,6 +732,12 @@ export class MainViewModel {
         this.logMsg(LogLevel.WARN, '任务已手动停止');
         this.progress = new TaskProgress(this.progress.current, days, TaskStatus.IDLE);
       }
+
+      // 上传成功之后当天才算得上数，顺手刷新一次日历（不再触发自动排计划）
+      if (this.successCount > 0) {
+        this.sessionSerial += 1;
+        this.refreshSemesterStats();
+      }
     } catch (e) {
       this.logMsg(LogLevel.ERROR, `错误: ${(e as Error).message}`);
       this.progress = new TaskProgress(this.progress.current, days, TaskStatus.FAILED);
@@ -437,11 +746,10 @@ export class MainViewModel {
     }
   }
 
-  /** 起始时刻：配置时间 ± 10 分钟 ± 30 秒随机波动，再按第 i 条向前推 i 天 */
-  private baseStartDateTimeMs(config: RunConfig, index: number): number {
-    const base = new Date(config.startDate.getFullYear(), config.startDate.getMonth(), config.startDate.getDate(),
+  /** 起始时刻：给定日期 + 配置时间，再叠加 ±10 分钟 / ±30 秒的随机波动 */
+  private baseStartDateTimeMs(config: RunConfig, date: Date): number {
+    const base = new Date(date.getFullYear(), date.getMonth(), date.getDate(),
       config.hour, config.minute, config.second);
-    base.setDate(base.getDate() - index);
     const jitterMs = randomInt(-600, 600) * 1000 + randomInt(-30, 30) * 1000;
     return base.getTime() + jitterMs;
   }
@@ -557,6 +865,10 @@ export class MainViewModel {
   /** 触发重新登录：清理 cookie 并回调（等价 triggerRelogin） */
   private triggerRelogin(): void {
     CookieService.clearAll();
+    // 会话已作废：日历回到占位，迟到的统计响应也会被 sessionSerial 挡掉
+    this.sessionSerial += 1;
+    this.loginState = false;
+    this.clearSemesterView();
     this.reloginRequired = true;
     if (this.onReloginRequired !== null) {
       this.onReloginRequired();

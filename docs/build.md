@@ -205,6 +205,13 @@ xcodebuild -project apps/ios/SJTURunningMan.xcodeproj -list
 
 用 **DevEco Studio** 打开 `apps/harmonyos/` 工程，选择合适的签名后构建 HAP；也可以直接命令行构建：
 
+> **SDK 版本写法**：`build-profile.json5` 的 `compileSdkVersion` / `targetSdkVersion` / `compatibleSdkVersion`
+> 必须写成 `'平台版本(API级别)'`，例如 `'6.0.1(21)'`。写成裸版本号（`"6.0.1"`）或编造的版本（`"26.0.0"`）时
+> hvigor 解析不出 API 级别，会直接报 `00306042 Specification Limit Violation … must be string` 并中止构建。
+> 工程按 API 21（HarmonyOS 6.0.1，DevEco Studio 6.0.1 自带）构建，界面只用原生 ArkUI：
+> `@kit.UIDesignKit`（HDS）与 `uiMaterial` 只在更新的 SDK 里才有，详见
+> [harmonyos.md](./harmonyos.md#8-开发说明已知的-arkts-工具链陷阱)。
+
 **Windows**
 
 ```powershell

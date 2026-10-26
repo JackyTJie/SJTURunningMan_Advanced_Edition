@@ -6,6 +6,8 @@ import { UploadResult } from '../model/PayloadModels';
 import { CookieService } from './CookieService';
 import { PointRules } from '../viewmodel/TaskModels';
 import { AppConfig } from '../config/AppConfig';
+import { DayState, SemesterRange, SemesterStats, percentFromRatio, recordDay } from './SemesterStats';
+import { parseDate } from '../utils/FormatUtil';
 
 /**
  * 网络服务
@@ -343,4 +345,259 @@ export class ApiService {
       req.destroy();
     }
   }
+
+  // ==================== 学期统计（只读） ====================
+
+  /** JSON 值 -> 对象（非对象返回 undefined） */
+  private static asObject(value: Object | undefined): Record<string, Object> | undefined {
+    if (value === undefined || value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined;
+    }
+    return value as Record<string, Object>;
+  }
+
+  /** obj[key] 指向对象时返回它（等价 Android 的 asObjectOrNull / objOf） */
+  private static objOf(parent: Record<string, Object> | undefined, key: string): Record<string, Object> | undefined {
+    if (parent === undefined) {
+      return undefined;
+    }
+    return ApiService.asObject(parent[key]);
+  }
+
+  /** obj[key] 指向数组时返回其元素列表（等价 Android 的 arrOf） */
+  private static arrOf(parent: Record<string, Object> | undefined, key: string): Object[] {
+    if (parent === undefined) {
+      return [];
+    }
+    const value = parent[key];
+    if (value === undefined || value === null || !Array.isArray(value)) {
+      return [];
+    }
+    return value as Object[];
+  }
+
+  /** 数组字段的第一个对象（等价 Android 的 firstObject）：服务器把 data 包成数组 */
+  private static firstObject(parent: Object | undefined, key: string): Record<string, Object> | undefined {
+    const root = ApiService.asObject(parent);
+    const list = ApiService.arrOf(root, key);
+    if (list.length === 0) {
+      return undefined;
+    }
+    return ApiService.asObject(list[0]);
+  }
+
+  /** 字符串字段（等价 Android 的 stringOrNull，只接受真正的字符串） */
+  private static stringOrNull(parent: Record<string, Object> | undefined, key: string): string | undefined {
+    if (parent === undefined) {
+      return undefined;
+    }
+    const value = parent[key];
+    return typeof value === 'string' ? value as string : undefined;
+  }
+
+  /**
+   * JSON 数值字段（等价 Android 的 jsonNumber）：
+   * 数字或字符串都接受，去掉尾部 % 与千分位逗号，非法值返回 undefined。
+   */
+  private static jsonNumber(value: Object | undefined): number | undefined {
+    let raw: string;
+    if (typeof value === 'number') {
+      raw = String(value as number);
+    } else if (typeof value === 'string') {
+      raw = value as string;
+    } else {
+      return undefined;
+    }
+    raw = raw.trim();
+    while (raw.endsWith('%')) {
+      raw = raw.substring(0, raw.length - 1);
+    }
+    raw = raw.replace(',', '');
+    const parsed = Number(raw);
+    if (raw.length === 0 || !Number.isFinite(parsed)) {
+      return undefined;
+    }
+    return parsed;
+  }
+
+  /** 服务器日期形如 `2026-09-19 07:52:19`，只取前 10 个字符；解析不出返回 undefined */
+  private static serverDate(text: string | undefined): Date | undefined {
+    if (text === undefined || text.length < 10) {
+      return undefined;
+    }
+    const parsed = parseDate(text.substring(0, 10));
+    return parsed === null ? undefined : parsed;
+  }
+
+  /** `state == "0"` 计入成绩，12/13 等是无效记录 */
+  private static countsTowardScore(value: Object | undefined): boolean {
+    let text: string;
+    if (typeof value === 'string') {
+      text = (value as string).trim();
+    } else if (typeof value === 'number') {
+      return (value as number) === 0;
+    } else {
+      return false;
+    }
+    if (!/^[+-]?\d+$/.test(text)) {
+      return false;
+    }
+    return parseInt(text) === 0;
+  }
+
+  /** 带会话 Cookie 的 GET，返回解析后的 JSON（失败抛错，由调用方决定是否忽略） */
+  private async getJson(url: string, query: string, what: string): Promise<Object> {
+    const cookie = CookieService.getCookie(`https://${AppConfig.HOST}`);
+    const header: Record<string, string> = {
+      'User-Agent': ApiService.APP_USER_AGENT,
+      'Accept': 'application/json, text/plain, */*',
+      'Referer': `https://${AppConfig.HOST}/phone/`
+    };
+    if (cookie.length > 0) {
+      header['Cookie'] = cookie;
+    }
+    const req = http.createHttp();
+    try {
+      const resp = await req.request(query.length > 0 ? `${url}?${query}` : url, {
+        method: http.RequestMethod.GET,
+        header: header,
+        expectDataType: http.HttpDataType.STRING,
+        usingCache: false,
+        connectTimeout: 15000,
+        readTimeout: 20000
+      });
+      const body = resp.result as string;
+      if (resp.responseCode < 200 || resp.responseCode >= 300) {
+        throw new Error(`${what}请求失败: HTTP ${resp.responseCode}`);
+      }
+      if (ApiService.isJAccountLoginPage(body)) {
+        throw new Error(`${what}请求返回登录页，cookie 已过期`);
+      }
+      return JSON.parse(body) as Object;
+    } finally {
+      req.destroy();
+    }
+  }
+
+  /** 带会话 Cookie 的 POST（空 JSON 体），部分接口必须用 POST 才返回数据 */
+  private async postEmptyJson(url: string, what: string): Promise<Object> {
+    const cookie = CookieService.getCookie(`https://${AppConfig.HOST}`);
+    const header: Record<string, string> = {
+      'User-Agent': ApiService.APP_USER_AGENT,
+      'Accept': 'application/json, text/plain, */*',
+      'Referer': `https://${AppConfig.HOST}/phone/`,
+      'Content-Type': 'application/json; charset=utf-8'
+    };
+    if (cookie.length > 0) {
+      header['Cookie'] = cookie;
+    }
+    const req = http.createHttp();
+    try {
+      const resp = await req.request(url, {
+        method: http.RequestMethod.POST,
+        header: header,
+        extraData: '{}',
+        expectDataType: http.HttpDataType.STRING,
+        usingCache: false,
+        connectTimeout: 15000,
+        readTimeout: 20000
+      });
+      const body = resp.result as string;
+      if (resp.responseCode < 200 || resp.responseCode >= 300) {
+        throw new Error(`${what}请求失败: HTTP ${resp.responseCode}`);
+      }
+      if (ApiService.isJAccountLoginPage(body)) {
+        throw new Error(`${what}请求返回登录页，cookie 已过期`);
+      }
+      return JSON.parse(body) as Object;
+    } finally {
+      req.destroy();
+    }
+  }
+
+  /**
+   * 只读学期统计：达标公里、完成率、学期目标、学期起止与本学期打卡日期。
+   * 迁移自 Android ApiService.semesterStats()。
+   *
+   * 这些接口只要 pe.sjtu.edu.cn 的会话 Cookie，不需要 /sports/my/uid 换的 token。
+   * 其中学期目标与学期起止日期失败时不阻塞其余数据。
+   *
+   * 抛出的错误由调用方（MainViewModel.refreshSemesterStats）转成日志。
+   */
+  async semesterStats(): Promise<SemesterStats> {
+    const stats = new SemesterStats();
+
+    // 1) 本学期达标公里 / 总公里 / 完成率
+    const summaryRoot = await this.getJson(AppConfig.MY_DATA_URL, '', '学期统计');
+    const summary = ApiService.firstObject(summaryRoot, 'data');
+    stats.resultKm = ApiService.jsonNumber(summary === undefined ? undefined : summary['resultKm']);
+    stats.totalKm = ApiService.jsonNumber(summary === undefined ? undefined : summary['totalKm']);
+    const percent = ApiService.jsonNumber(summary === undefined ? undefined : summary['percent']);
+    // 服务器没给 percent 时用 达标/总公里 兜底
+    stats.percent = percent !== undefined ? percent : percentFromRatio(stats.resultKm, stats.totalKm);
+
+    // 2) 学期目标（失败不阻塞）
+    try {
+      const targetRoot = await this.getJson(AppConfig.SEMESTER_TARGET_URL, '', '学期目标');
+      const targetData = ApiService.objOf(ApiService.asObject(targetRoot), 'data');
+      stats.targetKm = ApiService.jsonNumber(targetData === undefined ? undefined : targetData['target']);
+    } catch (e) {
+      hilog.warn(0x0000, ApiService.TAG, '学期目标获取失败，忽略: %{public}s', ApiService.describeError(e as Object));
+    }
+
+    // 3) 当前学期 id 与名称
+    const listRoot = await this.getJson(AppConfig.SEMESTER_LIST_URL, 'type=1', '学期列表');
+    const entry = ApiService.firstObject(listRoot, 'data');
+    const semesterId = entry === undefined ? undefined : ApiService.stringOrNull(entry, 'semesterId');
+    if (semesterId === undefined || semesterId.trim().length === 0) {
+      throw new Error('学期列表缺少 semesterId');
+    }
+    const rawName = entry === undefined ? undefined : ApiService.stringOrNull(entry, 'semesterName');
+    if (rawName !== undefined && rawName.trim().length > 0) {
+      stats.semesterName = rawName.trim();
+    }
+
+    // 4) 学期起止日期（失败不阻塞，日历退化为占位）
+    try {
+      const infoRoot = await this.postEmptyJson(AppConfig.USER_INFO_URL, '学期日期');
+      const infoData = ApiService.objOf(ApiService.asObject(infoRoot), 'data');
+      const dateEntry = ApiService.firstObject(infoData, 'semesterDateList');
+      const start = ApiService.serverDate(dateEntry === undefined ? undefined : ApiService.stringOrNull(dateEntry,
+        'startDate'));
+      const end = ApiService.serverDate(dateEntry === undefined ? undefined : ApiService.stringOrNull(dateEntry,
+        'endDate'));
+      if (start !== undefined && end !== undefined) {
+        stats.range = SemesterRange.of(start, end);
+      }
+    } catch (e) {
+      hilog.warn(0x0000, ApiService.TAG, '学期日期获取失败，忽略: %{public}s', ApiService.describeError(e as Object));
+    }
+
+    // 5) 本学期全部跑步记录 -> 每天的打卡状态
+    const recordsRoot = await this.getJson(AppConfig.RESULT_LIST_URL,
+      `selectId=${encodeURIComponent(semesterId)}&type=1`, '跑步记录');
+    const runDays = stats.runDays;
+    const weeks = ApiService.arrOf(ApiService.asObject(recordsRoot), 'data');
+    for (let w = 0; w < weeks.length; w++) {
+      const week = ApiService.asObject(weeks[w]);
+      const details = ApiService.arrOf(week, 'details');
+      for (let d = 0; d < details.length; d++) {
+        const record = ApiService.asObject(details[d]);
+        if (record === undefined) {
+          continue;
+        }
+        const date = ApiService.serverDate(ApiService.stringOrNull(record, 'timeFrom'));
+        if (date === undefined) {
+          continue;
+        }
+        const state = ApiService.countsTowardScore(record['state']) ? DayState.VALID : DayState.INVALID;
+        recordDay(runDays, date, state);
+      }
+    }
+
+    hilog.info(0x0000, ApiService.TAG, 'semesterStats ok: runDays=%{public}d range=%{public}s',
+      runDays.size, stats.range === undefined ? '无' : '有');
+    return stats;
+  }
 }
+

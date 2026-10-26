@@ -11,12 +11,14 @@
 import { promptAction } from '@kit.ArkUI';
 
 /**
- * HdsNavigation 在 MINI 标题模式下的标题栏高度（vp）。
- * 一级页使用 MINI 模式（标题与右上角菜单按钮同一行，见 Index.ets），
- * titleBar 是悬浮层、覆盖在内容区上方，内容首部必须预留等高空间避让，
- * 否则标题栏会遮挡卡片/按钮等控件（官方示例以 Blank().height(标题栏高度) 作为滚动内容首元素实现避让）。
+ * 一级页顶部标题栏高度（vp）。
+ *
+ * 由 Index.ets 自绘（标题与右上角“账号/关于”图标按钮同一行），作为 Navigation 内容区的
+ * 第一个子节点参与正常布局流，与二级页 NavDestination 自带标题栏的高度保持一致，
+ * 进出二级页时顶部栏的跳动最小。
+ * 注意：它是布局中的实体高度，滚动内容不需要再为它预留 top padding（HDS 时代才需要）。
  */
-export const HDS_MINI_TITLE_BAR_HEIGHT: number = 56;
+export const APP_HEADER_HEIGHT: number = 56;
 
 /**
  * 任务设置卡片（自绘，视觉对齐 HdsListItemCard）的几何常量，单位 vp。

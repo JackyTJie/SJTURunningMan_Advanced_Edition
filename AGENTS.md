@@ -43,7 +43,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 | 轨迹生成 | `desktop/src-tauri/src/task.rs` | `data/DataGenerator.kt` | `DataGenerator.swift` | `service/DataGenerator.ets` |
 | 网络层 | `desktop/src-tauri/src/api.rs` | `network/ApiService.kt` | `ApiService.swift` | `service/ApiService.ets` |
 | 路线管理 | `desktop/src-tauri/src/route.rs` + `route_planner.html` | `route/RouteManager.kt` | `RouteManager.swift` | `service/RouteManager.ets` |
-| 常量配置 | `desktop/src-tauri/src/settings.rs` + `stats.rs` | `config/AppConfig.kt` | `AppConfig.swift` | 分散在 `view/RunScreen.ets` |
+| 常量配置 | `desktop/src-tauri/src/settings.rs` + `stats.rs` | `config/AppConfig.kt` | `AppConfig.swift` | `config/AppConfig.ets` + `service/SemesterStats.ets` |
 | 登录 | `desktop/src-tauri/src/api.rs` | `login/LoginActivity.kt` | `LoginView.swift` | `pages/Login.ets` |
 | 坐标工具 | `desktop/src-tauri/src/route.rs` | `utils/GpsUtil.kt` | `GpsUtil.swift` | `service/GpsUtil.ets` |
 
