@@ -8,7 +8,8 @@
 | --- | --- | --- | --- |
 | `desktop-tauri-light.webp` | 1000×700 | Tauri 2 + MD3 电脑版浅色工作台，含轨迹预览 | 约 38 KB |
 | `desktop-tauri-dark.webp` | 1000×700 | Tauri 2 + MD3 电脑版深色工作台，含轨迹预览 | 约 37 KB |
-| `desktop-tauri-login.webp` | 1000×700 | JAccount 登录窗口，验证码输入框与图片已遮挡 | 约 21 KB |
+| `desktop-tauri-login.webp` | 1000×700 | JAccount 登录窗口（账号密码 / 扫码分段切换），验证码输入框与图片已遮挡 | 约 20 KB |
+| `desktop-tauri-login-qr.webp` | 1000×700 | 扫码登录面板，示例二维码不可用 | 约 27 KB |
 | `desktop-tauri-logs.webp` | 1000×700 | 学期日历与运行日志两栏 | 约 30 KB |
 | `desktop-tauri-routes.webp` | 1000×700 | 导入路线、跳段警告与删除入口 | 约 30 KB |
 | `desktop-native-light.webp` | 1000×732 | 旧 Rust + Slint 浅色界面（历史对照） | 约 21 KB |
@@ -25,7 +26,7 @@
 
 全部为 WebP。`desktop-tauri-*` 由 mock IPC 下的生产前端截图生成；旧 Rust + Slint 与 Qt 截图保留作历史对照。
 
-前八张是各平台的**应用界面**截图（手机 480 px / 桌面 1000 px 宽），其中 `desktop-main.webp` 是迁移前的旧 Qt 界面，仅作历史对照。后三张是 macOS 的**安装流程**截图，内容是系统弹窗与系统设置界面，按原始比例裁剪，未套用统一宽度。
+应用界面截图（桌面端 `desktop-tauri-*`、安卓、iOS、鸿蒙）按手机 480 px / 桌面 1000 px 宽存放，其中 `desktop-main.webp` 是迁移前的旧 Qt 界面，仅作历史对照。最后三张是 macOS 的**安装流程**截图，内容是系统弹窗与系统设置界面，按原始比例裁剪，未套用统一宽度。
 
 **尺寸约定**：手机端统一缩到 **480 px 宽**，桌面端 **1000 px 宽**。文档渲染时 GitHub 会把图片压到容器宽度（约 850 px）以内，再大的分辨率只是徒增仓库体积 —— 480 px 下字段名、按钮、日志文字仍然清晰可辨。
 

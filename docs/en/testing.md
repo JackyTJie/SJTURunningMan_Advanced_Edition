@@ -121,7 +121,8 @@ node desktop/e2e/screenshot.mjs                                 # screenshots in
 - [ ] In the single-column layout, the end-date calendar and route dropdown paint above the preview card instead of being covered.
 - [ ] Default route, import from the Routes page, duplicate names, persistence and copy-only deletion work; the source remains untouched.
 - [ ] "Open in map" embeds the map in the preview card with matching endpoints and track; the workbench has no "Collapse map" button, while Route management can collapse to the SVG; the planner still opens in the browser and its TXT can be imported.
-- [ ] With a valid account, automatic CAPTCHA recognition, refresh/manual fallback, and app/email/SMS verification work; the password is cleared from the field immediately after submission.
+- [ ] With a valid account, automatic CAPTCHA recognition, refresh/manual fallback, and app/email/SMS verification work; a rejected password fetches a new CAPTCHA automatically without clicking refresh; the password is cleared from the field immediately after submission.
+- [ ] QR code login: the code renders and refreshes about once a minute; scanning it with the My SJTU app or WeChat and confirming on the phone completes the login; switching back to password login or cancelling stops the subscription; an expired code recovers through "Refresh QR code".
 - [ ] Two-factor verification: app / email / SMS delivery works; a six-digit code submitted within its validity window succeeds; resending invalidates the previous code; errors distinguish expiry, lost session and other codes.
 - [ ] After login the semester progress and calendar refresh automatically; while logged out or after a failed refresh they keep placeholders and logout restores them.
 - [ ] The calendar distinguishes counted runs (solid blue), invalid records (red outline) and rest days (grey); dates outside the semester are blank; the two log columns scroll without overflow at the 1000×700 minimum window.

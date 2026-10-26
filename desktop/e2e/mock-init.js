@@ -66,6 +66,42 @@ const captchaSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="132" height="
 </svg>`;
 const captcha = 'data:image/svg+xml;base64,' + btoa(captchaSvg);
 
+const qrModules = (() => {
+  let seed = 20261026;
+  const next = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  const cells = [];
+  for (let y = 0; y < 25; y++) {
+    for (let x = 0; x < 25; x++) {
+      const finder = (x < 7 && y < 7) || (x > 17 && y < 7) || (x < 7 && y > 17);
+      if (!finder && next() > 0.48) {
+        cells.push(`<rect x="${12 + x * 6.4}" y="${12 + y * 6.4}" width="5.6" height="5.6"/>`);
+      }
+    }
+  }
+  return cells.join('');
+})();
+const qrSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="185" height="185" viewBox="0 0 185 185">
+  <rect width="185" height="185" fill="#ffffff"/>
+  <g fill="#0b1f33">${qrModules}</g>
+  <g fill="none" stroke="#0b1f33" stroke-width="6">
+    <rect x="13" y="13" width="34" height="34"/>
+    <rect x="138" y="13" width="34" height="34"/>
+    <rect x="13" y="138" width="34" height="34"/>
+  </g>
+  <g fill="#0b1f33">
+    <rect x="23" y="23" width="14" height="14"/>
+    <rect x="148" y="23" width="14" height="14"/>
+    <rect x="23" y="148" width="14" height="14"/>
+  </g>
+</svg>`;
+const qrImage = 'data:image/svg+xml;base64,' + btoa(qrSvg);
+const qrImageRefreshed = 'data:image/svg+xml;base64,' + btoa(qrSvg.replace('<rect width="185" height="185" fill="#ffffff"/>', '<rect width="185" height="185" fill="#eef3ff"/>'));
+let qrGeneration = 0;
+window.__QR_IMAGES__ = { initial: qrImage, refreshed: qrImageRefreshed };
+
 let mockMode = 'authenticated';
 window.__MOCK_CALLS__ = [];
 const callbacks = new Map();
@@ -161,6 +197,14 @@ function handle(command, args) {
         stage: 'authenticated',
         user: 'student',
         notice: '登录成功，会话仅保留在内存中',
+      };
+    case 'prepare_qr_login':
+      qrGeneration += 1;
+      window.__LAST_QR_GENERATION__ = qrGeneration;
+      return {
+        generation: qrGeneration,
+        qr: qrImage,
+        notice: '打开「交我办」App 或微信，扫描二维码并在手机上确认登录',
       };
     case 'send_code':
       return '验证码已发送，请查收';

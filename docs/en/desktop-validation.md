@@ -52,6 +52,14 @@ The same check sent one My SJTU app code, verified the user-provided code, check
 
 Regression tests cover the password-login form marker, AJAX/Referer headers, returned redirects, two-factor handling, controlled CAPTCHA/password errors, missing/untrusted redirects, and response redaction. Second-factor requests and the final authorization redirect restore Referer; completion checks the authentication cookie rather than accepting HTTP 200 alone.
 
+## QR login and automatic CAPTCHA refresh
+
+QR login reuses the same path as the school login page: the client opens `oauth2/authorize` on a cookie-backed session to read the page uuid, then subscribes to `wss://jaccount.sjtu.edu.cn/jaccount/sub/<uuid>`. It sends `UPDATE_QR_CODE` to receive `ts` + `sig`, fetches the signed 185×185 PNG, and after the phone confirms, the server pushes `LOGIN`; the client then calls `expresslogin` and completes the same OAuth redirect used by password login. The code rotates every 60 seconds, matching the school page.
+
+To avoid guessing the protocol, the "open login page → open WebSocket → read ticket → fetch QR image" path was checked against the live service (`cargo test --locked -p sjturunningman live_qr_login_can_be_prepared -- --ignored`). It only fetches an anonymous code: no scan and no account submission. **Phone confirmation and the final login still need real-device acceptance**: scan once with the My SJTU app before release and confirm the client switches to the signed-in state. It was also confirmed that calling `expresslogin` repeatedly before login invalidates the school-side code, so the client only calls it after the WebSocket `LOGIN` message; switching, cancelling or closing the dialog stops the subscription through a cancel flag.
+
+Automatic CAPTCHA refresh follows the school page as well: a rejected password invalidates the graphical CAPTCHA, so the client immediately prepares and recognises a new one instead of asking for a refresh click. It only asks the user to refresh when that automatic attempt fails. Login-method switches, cancellation and late responses are discarded by sequence number, so results from an old QR subscription never reach the UI.
+
 ## Branding and About fix
 
 The sidebar reuses the original icon. This UI revision replaces the earlier handwritten SVG wordmark with a clean system sans-serif `RunningMan` label. About provides the legacy Shuiyuan discussion and GitHub links with existing icons and appropriate dark-theme colors. Both links retain their legacy destinations and open in the system browser. Update notices still direct users to GitHub Releases.

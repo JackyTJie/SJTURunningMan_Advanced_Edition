@@ -2,6 +2,7 @@ pub mod api;
 pub mod commands;
 pub mod maps;
 pub mod preview;
+pub mod qr;
 pub mod route;
 pub mod settings;
 pub mod stats;

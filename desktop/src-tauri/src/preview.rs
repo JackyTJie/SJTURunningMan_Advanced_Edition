@@ -6,16 +6,24 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 pub fn captcha_data_url(bytes: &[u8]) -> Result<String, String> {
-    let format = image::guess_format(bytes)
-        .map_err(|_| "验证码接口未返回有效图片，请刷新重试".to_string())?;
+    image_data_url(bytes, "验证码接口未返回有效图片，请刷新重试")
+}
+
+/// 扫码登录的二维码（学校返回 185×185 PNG）。
+pub fn qr_data_url(bytes: &[u8]) -> Result<String, String> {
+    image_data_url(bytes, "二维码接口未返回有效图片，请重新获取")
+}
+
+fn image_data_url(bytes: &[u8], invalid: &str) -> Result<String, String> {
+    let format = image::guess_format(bytes).map_err(|_| invalid.to_string())?;
     // 复用 api 层的尺寸/内存上限校验，校验通过后再交给 WebView。
-    crate::api::decode_captcha(bytes)?;
+    crate::api::decode_image(bytes, invalid)?;
     let mime = match format {
         image::ImageFormat::Png => "image/png",
         image::ImageFormat::Jpeg => "image/jpeg",
         image::ImageFormat::Gif => "image/gif",
         image::ImageFormat::WebP => "image/webp",
-        _ => return Err("验证码图片格式不受支持，请刷新重试".into()),
+        _ => return Err(invalid.into()),
     };
     Ok(format!("data:{mime};base64,{}", STANDARD.encode(bytes)))
 }

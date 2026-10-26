@@ -50,6 +50,9 @@ pub struct AppState {
     preview_inputs: Option<PreviewInputs>,
     session: Option<Session>,
     challenge: Option<LoginChallenge>,
+    /// 正在等待手机确认的扫码登录；`qr_generation` 用来丢弃上一轮扫码的迟到事件。
+    qr_cancel: Option<Arc<AtomicBool>>,
+    qr_generation: u64,
     two_factor: Option<Session>,
     user: String,
     cancel: Arc<AtomicBool>,
@@ -104,6 +107,15 @@ impl AppState {
     fn clear_preview(&mut self) {
         self.preview = None;
         self.preview_inputs = None;
+    }
+
+    /// 停止扫码登录的订阅线程；线程会在下一次读超时后自行退出。
+    /// 同时递增序号，上一轮扫码的迟到事件不会再写回界面。
+    fn stop_qr(&mut self) {
+        if let Some(cancel) = self.qr_cancel.take() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        self.qr_generation += 1;
     }
 }
 
@@ -311,6 +323,40 @@ pub struct LoginPreparation {
     captcha_code: Option<String>,
     manual: bool,
     notice: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QrPreparation {
+    /// 本轮扫码的序号；界面只用序号相同的事件。
+    generation: u64,
+    /// 二维码图片的 data URL。
+    qr: String,
+    notice: String,
+}
+
+/// 扫码登录的后台线程通过事件推给界面：换码、登录成功、需要二次验证或失败。
+#[derive(Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum QrEvent {
+    Image {
+        generation: u64,
+        qr: String,
+    },
+    Authenticated {
+        generation: u64,
+        user: String,
+        notice: String,
+    },
+    TwoFactor {
+        generation: u64,
+        user: String,
+        notice: String,
+    },
+    Failed {
+        generation: u64,
+        message: String,
+    },
 }
 
 #[derive(Clone, Serialize)]
@@ -689,6 +735,7 @@ pub async fn prepare_login(state: State<'_, Mutex<AppState>>) -> Result<LoginPre
     {
         let mut app = lock(&state)?;
         app.challenge = None;
+        app.stop_qr();
     }
     let prepared = tauri::async_runtime::spawn_blocking(|| {
         let challenge = Session::prepare_login()?;
@@ -768,8 +815,194 @@ pub async fn submit_login(
                 notice: "请选择验证方式并发送验证码".into(),
             })
         }
-        Err(error) => Err(format!("{error}；请点击刷新，重新自动识别后重试")),
+        Err(error) => Err(error),
     }
+}
+
+#[tauri::command]
+pub async fn prepare_qr_login(
+    app: AppHandle,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<QrPreparation, String> {
+    let generation = {
+        let mut current = lock(&state)?;
+        current.stop_qr();
+        current.challenge = None;
+        current.qr_generation
+    };
+    let cancel = Arc::new(AtomicBool::new(false));
+    let prepared = {
+        let cancel = cancel.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let (session, uuid) = Session::prepare_qr_login()?;
+            let mut channel = session.open_qr_channel(&uuid)?;
+            let ticket = channel.wait_ticket(&cancel)?;
+            let image = session.qr_image(&uuid, &ticket)?;
+            Ok::<_, String>((session, uuid, channel, image))
+        })
+        .await
+        .map_err(|error| format!("二维码准备任务失败：{error}"))?
+    };
+    let (session, uuid, channel, image) = prepared?;
+    let qr = preview::qr_data_url(&image)?;
+    {
+        let mut current = lock(&state)?;
+        if current.qr_generation != generation {
+            return Err("二维码登录已取消".into());
+        }
+        current.qr_cancel = Some(cancel.clone());
+    }
+    spawn_qr_watcher(app, generation, cancel, session, uuid, channel);
+    Ok(QrPreparation {
+        generation,
+        qr,
+        notice: "打开「交我办」App 或微信，扫描二维码并在手机上确认登录".into(),
+    })
+}
+
+/// 订阅通道，等待手机确认；每 60 秒换一张二维码，与学校登录页保持一致。
+fn spawn_qr_watcher(
+    app: AppHandle,
+    generation: u64,
+    cancel: Arc<AtomicBool>,
+    session: Session,
+    uuid: String,
+    mut channel: crate::qr::Channel,
+) {
+    std::thread::spawn(move || {
+        let mut last_request = Instant::now();
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                channel.close();
+                return;
+            }
+            if last_request.elapsed() >= crate::qr::REFRESH_INTERVAL {
+                last_request = Instant::now();
+                if channel.request().is_err() {
+                    fail_qr(&app, &cancel, generation, "二维码刷新失败，请重新获取");
+                    channel.close();
+                    return;
+                }
+            }
+            match channel.poll_signal() {
+                Ok(Some(crate::qr::Signal::Ticket(ticket))) => {
+                    let refreshed = session
+                        .qr_image(&uuid, &ticket)
+                        .and_then(|image| preview::qr_data_url(&image));
+                    let qr = match refreshed {
+                        Ok(qr) => qr,
+                        Err(message) => {
+                            fail_qr(&app, &cancel, generation, &message);
+                            channel.close();
+                            return;
+                        }
+                    };
+                    if cancel.load(Ordering::Relaxed) {
+                        channel.close();
+                        return;
+                    }
+                    let _ = app.emit("qr-login", QrEvent::Image { generation, qr });
+                }
+                Ok(Some(crate::qr::Signal::Login)) => {
+                    finish_qr_login(&app, &cancel, generation, &session, &uuid);
+                    channel.close();
+                    return;
+                }
+                Ok(Some(crate::qr::Signal::Other)) | Ok(None) => {}
+                Err(message) => {
+                    fail_qr(&app, &cancel, generation, &message);
+                    channel.close();
+                    return;
+                }
+            }
+        }
+    });
+}
+
+fn finish_qr_login(
+    app: &AppHandle,
+    cancel: &AtomicBool,
+    generation: u64,
+    session: &Session,
+    uuid: &str,
+) {
+    if cancel.load(Ordering::Relaxed) {
+        return;
+    }
+    let result = session.express_login(uuid);
+    if cancel.load(Ordering::Relaxed) {
+        return;
+    }
+    let state = app.state::<Mutex<AppState>>();
+    let Ok(mut current) = state.lock() else {
+        return;
+    };
+    if current.qr_generation != generation {
+        return;
+    }
+    match result {
+        Ok(LoginResult::Authenticated(session)) => {
+            current.stop_qr();
+            current.session = Some(session);
+            current.user.clear();
+            current.challenge = None;
+            current.two_factor = None;
+            current.verification_attempts = 0;
+            current.session_serial += 1;
+            current.auto_adjust_pending = true;
+            drop(current);
+            let _ = app.emit(
+                "qr-login",
+                QrEvent::Authenticated {
+                    generation,
+                    user: String::new(),
+                    notice: "扫码登录成功，会话仅保留在内存中".into(),
+                },
+            );
+        }
+        Ok(LoginResult::TwoFactor(session)) => {
+            let account = session.two_factor_account().unwrap_or_default();
+            current.stop_qr();
+            current.two_factor = Some(session);
+            current.user = account.clone();
+            current.verification_attempts = 0;
+            drop(current);
+            let _ = app.emit(
+                "qr-login",
+                QrEvent::TwoFactor {
+                    generation,
+                    user: account,
+                    notice: "扫码登录需要二次验证，请选择验证方式".into(),
+                },
+            );
+        }
+        Err(message) => {
+            drop(current);
+            fail_qr(app, cancel, generation, &message);
+        }
+    }
+}
+
+fn fail_qr(app: &AppHandle, cancel: &AtomicBool, generation: u64, message: &str) {
+    if cancel.load(Ordering::Relaxed) {
+        return;
+    }
+    let state = app.state::<Mutex<AppState>>();
+    let Ok(current) = state.lock() else {
+        return;
+    };
+    // 已经开了新一轮扫码时，旧线程的失败不再打扰界面。
+    if current.qr_generation != generation {
+        return;
+    }
+    drop(current);
+    let _ = app.emit(
+        "qr-login",
+        QrEvent::Failed {
+            generation,
+            message: message.to_owned(),
+        },
+    );
 }
 
 #[tauri::command]
@@ -847,6 +1080,7 @@ pub async fn verify_code(
 pub fn cancel_login(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let mut app = lock(&state)?;
     app.challenge = None;
+    app.stop_qr();
     app.two_factor = None;
     app.user.clear();
     app.verification_attempts = 0;
@@ -858,6 +1092,7 @@ pub fn logout(state: State<'_, Mutex<AppState>>) -> Result<LogoutResult, String>
     let mut app = lock(&state)?;
     app.session = None;
     app.challenge = None;
+    app.stop_qr();
     app.two_factor = None;
     app.user.clear();
     app.session_serial += 1;
@@ -1433,6 +1668,8 @@ fn load_state(
         preview_inputs: None,
         session: None,
         challenge: None,
+        qr_cancel: None,
+        qr_generation: 0,
         two_factor: None,
         user: String::new(),
         cancel: Arc::new(AtomicBool::new(false)),
@@ -1630,6 +1867,7 @@ pub fn run() {
             open_planner,
             open_external,
             prepare_login,
+            prepare_qr_login,
             submit_login,
             send_code,
             verify_code,
@@ -1665,4 +1903,71 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用失败");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qr_events_match_the_frontend_contract() {
+        for (event, kind) in [
+            (
+                QrEvent::Image {
+                    generation: 3,
+                    qr: "data:image/png;base64,AA".into(),
+                },
+                "image",
+            ),
+            (
+                QrEvent::Authenticated {
+                    generation: 3,
+                    user: String::new(),
+                    notice: "ok".into(),
+                },
+                "authenticated",
+            ),
+            (
+                QrEvent::TwoFactor {
+                    generation: 3,
+                    user: "student".into(),
+                    notice: "ok".into(),
+                },
+                "twoFactor",
+            ),
+            (
+                QrEvent::Failed {
+                    generation: 3,
+                    message: "expired".into(),
+                },
+                "failed",
+            ),
+        ] {
+            let value = serde_json::to_value(event).unwrap();
+            assert_eq!(value["kind"], kind);
+            assert_eq!(value["generation"], 3);
+        }
+        let value = serde_json::to_value(QrEvent::Failed {
+            generation: 1,
+            message: "expired".into(),
+        })
+        .unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({"kind": "failed", "generation": 1, "message": "expired"})
+        );
+    }
+
+    #[test]
+    fn qr_preparation_uses_camel_case_fields() {
+        let value = serde_json::to_value(QrPreparation {
+            generation: 2,
+            qr: "data:image/png;base64,AA".into(),
+            notice: "ok".into(),
+        })
+        .unwrap();
+        assert_eq!(value["generation"], 2);
+        assert_eq!(value["qr"], "data:image/png;base64,AA");
+        assert_eq!(value["notice"], "ok");
+    }
 }
