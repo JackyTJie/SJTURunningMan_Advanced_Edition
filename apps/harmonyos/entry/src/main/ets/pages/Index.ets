@@ -1,19 +1,17 @@
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { promptAction } from '@kit.ArkUI';
-import {
-  hdsMaterial, HdsNavigation, HdsNavigationIconOptions, HdsNavigationMenuItemOptions, HdsNavigationTitleMode,
-  IconStyleMode
-} from '@kit.UIDesignKit';
 import { preferences } from '@kit.ArkData';
 import { RunScreen } from '../view/RunScreen';
 import { LoginPage } from '../pages/Login';
 import { RouteDesignPage } from '../pages/RouteDesign';
 import { AboutPage } from '../pages/About';
+import { SemesterPage } from '../pages/Semester';
 import { MainViewModel } from '../viewmodel/MainViewModel';
 import { LogLevel } from '../viewmodel/TaskModels';
 import { AppConfig } from '../config/AppConfig';
 import { CookieService } from '../service/CookieService';
+import { APP_HEADER_HEIGHT } from '../view/CommonComponents';
 
 const DOMAIN: number = 0x0000;
 const TAG: string = 'IndexPage';
@@ -25,20 +23,20 @@ const PREF_COMMITMENT_ACCEPTED: string = 'commitment_accepted';
  * 迁移自 Android: com.sjtu.runner.MainActivity + MainScreen.kt 中的 RootScreen
  *
  * - Activity -> @Entry 页面（Stage 模型）
- * - 右上角菜单 -> HdsNavigation titleBar.menu（“账号/登录”与“关于”两个图标按钮），
- *   等价 Android CenterAlignedTopAppBar 的 action 槽位；标题与按钮同一行（MINI 标题模式）
- * - 二级页面（登录/路线设计/关于）-> HdsNavDestination + NavPathStack，
+ * - 右上角菜单 -> 本页自绘标题栏（TitleBar Builder）里的“账号/登录”与“关于”图标按钮，
+ *   等价 Android CenterAlignedTopAppBar 的 action 槽位；标题与按钮同一行
+ * - 二级页面（登录/路线设计/学期日历/关于）-> 原生 Navigation + NavDestination + NavPathStack，
  *   由系统提供标题栏与返回控件（等价 Android startActivity/startActivityForResult）
  * - 使用承诺书门禁：与安卓一致，未同意时以全屏卡片遮挡并允许“退出”结束应用
  *
  * 说明：此前用 HdsTabs 悬浮页签承载“开润/账号”，现按需求取消底部页签，
  * 账号入口（登录状态/退出登录）与“关于”统一收进标题栏右上角图标按钮。
  *
- * 沉浸光感适配：
- * 1. aboutToAppear 中调用 hdsMaterial.getSystemMaterialTypes() 查询设备材质能力，
- *    不支持 IMMERSIVE 时降级为 SMOOTH 档位，避免低端设备卡顿发热；
- * 2. HdsNavigation 标题栏使用 ADAPTIVE 自适应档位；
- * 3. 应用级开关已在 module.json5 配置 ohos.arkui.UIMaterial.state = enable。
+ * 关于 HDS / 沉浸光感：旧实现用 UI Design Kit 的 HdsNavigation + hdsMaterial 渲染
+ * 沉浸光感标题栏，但该 Kit（连同 ArkUI 的 uiMaterial.ImmersiveMaterial）只在更晚的
+ * SDK 里才有；本工程按 API 21（HarmonyOS 6.0.1）构建，故改用原生 Navigation + 自绘标题栏，
+ * 视觉降级为普通的实色标题栏与卡片。要恢复沉浸光感需升级 DevEco Studio / SDK 到含
+ * UIDesignKit 的版本，并用 'x.y.z(API级别)' 形式回写 compileSdkVersion。
  */
 @Entry
 @Component
@@ -47,33 +45,12 @@ struct Index {
   /** 主导航栈：登录 / 路线设计 / 关于 二级页均挂载于此 */
   private pathStack: NavPathStack = new NavPathStack();
 
-  @State materialLevel: hdsMaterial.MaterialLevel = hdsMaterial.MaterialLevel.ADAPTIVE;
-  @State materialType: hdsMaterial.MaterialType = hdsMaterial.MaterialType.ADAPTIVE;
   /** 使用承诺书是否已同意（持久化于 app_prefs/commitment_accepted；读取失败时保持未同意） */
   @State commitmentAccepted: boolean = false;
   /** 承诺书勾选状态（等价 Android MainScreen 的 commitmentChecked） */
   @State commitmentChecked: boolean = false;
 
   aboutToAppear(): void {
-    // 查询设备支持的 HDS 材质类型，设备不支持 IMMERSIVE 时降级 SMOOTH（官方 FAQ 推荐做法）
-    try {
-      const types: hdsMaterial.MaterialType[] = hdsMaterial.getSystemMaterialTypes();
-      let immersiveSupported = false;
-      for (let i = 0; i < types.length; i++) {
-        if (types[i] === hdsMaterial.MaterialType.IMMERSIVE) {
-          immersiveSupported = true;
-          break;
-        }
-      }
-      this.materialType = hdsMaterial.MaterialType.ADAPTIVE;
-      this.materialLevel = immersiveSupported
-        ? hdsMaterial.MaterialLevel.ADAPTIVE
-        : hdsMaterial.MaterialLevel.SMOOTH;
-    } catch (e) {
-      hilog.warn(DOMAIN, TAG, 'getSystemMaterialTypes failed: %{public}s', JSON.stringify(e));
-      this.materialLevel = hdsMaterial.MaterialLevel.SMOOTH;
-    }
-
     // 触发重新登录回调：清理 cookie 并跳转登录页（等价 MainActivity.onReloginRequired）
     this.viewModel.onReloginRequired = () => {
       this.viewModel.logMsg(LogLevel.WARN, '检测到cookie过期，正在重新登录...');
@@ -119,7 +96,7 @@ struct Index {
 
   /**
    * 使用承诺书门禁（等价 Android CommitmentDialog）。
-   * 覆盖在整个 HdsNavigation 之上（含标题栏与悬浮页签），未同意时无法操作其它界面；
+   * 覆盖在整个 Navigation 之上（含自绘标题栏），未同意时无法操作其它界面；
    * Android 用 AlertDialog + 复选框，ArkUI 的 AlertDialog 不支持自定义内容组件，故用全屏遮罩实现。
    */
   @Builder
@@ -230,31 +207,72 @@ struct Index {
     CookieService.clearAll();
     this.viewModel.loginState = false;
     this.viewModel.reloginRequired = false;
+    // 退出账号后学期进度与日历不能留着上一个账号的数据
+    this.viewModel.clearSemesterView();
     promptAction.showToast({ message: '已退出登录', duration: 1500 });
   }
 
-  /** 标题栏右上角菜单项（等价 Android TopAppBar 的 action） */
-  private buildTitleMenus(): HdsNavigationMenuItemOptions[] {
-    const accountIcon: HdsNavigationIconOptions = {
-      icon: $r('sys.symbol.person_crop_circle_fill_1'),
-      label: this.viewModel.loginState ? '账号' : '登录',
-      type: IconStyleMode.NORMAL,
-      action: (): void => {
-        this.onAccountEntry();
-      }
-    };
-    const aboutIcon: HdsNavigationIconOptions = {
-      icon: $r('sys.symbol.info_circle'),
-      label: '关于',
-      type: IconStyleMode.NORMAL,
-      action: (): void => {
-        this.pathStack.pushPathByName('About', null);
-      }
-    };
-    const menus: HdsNavigationMenuItemOptions[] = [];
-    menus.push({ content: accountIcon });
-    menus.push({ content: aboutIcon });
-    return menus;
+  /** 标题栏右侧图标按钮（等价 Android TopAppBar 的 action） */
+  @Builder
+  ActionIcon(symbol: Resource, label: string, onTap: () => void) {
+    Button() {
+      SymbolGlyph(symbol)
+        .fontSize(22)
+        .fontColor([$r('app.color.text_primary')])
+    }
+    .type(ButtonType.Circle)
+    .width(44)
+    .height(44)
+    .backgroundColor(Color.Transparent)
+    .accessibilityText(label)
+    .onClick(() => {
+      onTap();
+    })
+  }
+
+  /**
+   * 顶部标题栏：标题与右上角两个图标按钮同一行（原本由 HDS MINI 标题模式提供）。
+   * 它是布局中的实体节点（AppHeader 高度 APP_HEADER_HEIGHT），不是悬浮层。
+   */
+  @Builder
+  TitleBar() {
+    Row({ space: 4 }) {
+      Text('开润')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.text_primary'))
+        .layoutWeight(1)
+        .textAlign(TextAlign.Start)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+      this.ActionIcon(
+        $r('sys.symbol.calendar'),
+        '学期日历',
+        (): void => {
+          this.pathStack.pushPathByName('Semester', null);
+        }
+      )
+      this.ActionIcon(
+        $r('sys.symbol.person_crop_circle_fill_1'),
+        this.viewModel.loginState ? '账号' : '登录',
+        (): void => {
+          this.onAccountEntry();
+        }
+      )
+      this.ActionIcon(
+        $r('sys.symbol.info_circle'),
+        '关于',
+        (): void => {
+          this.pathStack.pushPathByName('About', null);
+        }
+      )
+    }
+    .width('100%')
+    .height(APP_HEADER_HEIGHT)
+    .padding({ left: 16, right: 8 })
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor($r('app.color.page_background'))
   }
 
   /** 二级页路由表：登录 / 路线设计 / 关于（系统标题栏 + 原生返回键） */
@@ -266,45 +284,38 @@ struct Index {
       RouteDesignPage({ navStack: this.pathStack })
     } else if (name === 'About') {
       AboutPage()
+    } else if (name === 'Semester') {
+      SemesterPage()
     }
   }
 
   build() {
-    // 单根容器 Stack：HdsNavigation 与全屏承诺书遮罩是兄弟节点（等价 Android 中
+    // 单根容器 Stack：Navigation 与全屏承诺书遮罩是兄弟节点（等价 Android 中
     // CommitmentDialog 渲染在 Scaffold 之外，覆盖含顶栏的整屏）
     Stack() {
-      HdsNavigation(this.pathStack) {
-        RunScreen({ navStack: this.pathStack })
+      Navigation(this.pathStack) {
+        Column() {
+          this.TitleBar()
+          // 一级页内容占据标题栏之外的剩余高度（RunScreen 自身按 100% 高度布局）
+          Column() {
+            RunScreen({ navStack: this.pathStack })
+          }
+          .width('100%')
+          .layoutWeight(1)
+        }
+        .width('100%')
+        .height('100%')
+        .alignItems(HorizontalAlign.Start)
       }
       .mode(NavigationMode.Stack)
       .navDestination(this.PageMap)
-      .titleBar({
-        content: {
-          title: {
-            mainTitle: '开润'
-          },
-          menu: {
-            value: this.buildTitleMenus(),
-            maxCount: 2
-          }
-        },
-        style: {
-          systemMaterialEffect: {
-            materialType: this.materialType,
-            materialLevel: this.materialLevel
-          }
-        }
-      })
-      // MINI 标题模式：标题与右上角按钮处于同一行（需求：页面标题与按钮平齐）；
-      // 二级页 HdsNavDestination 的返回键不受影响
-      .titleMode(HdsNavigationTitleMode.MINI)
-      .hideBackButton(true)
-      // 安全区：保持系统默认避让（此前 ignoreLayoutSafeArea 使内容顶入状态栏，
-      // 导致二级页返回键贴顶无法点击）
+      // 标题栏由本页自绘（TitleBar），关闭 Navigation 自带标题栏避免出现两条
+      .hideTitleBar(true)
+      .hideToolBar(true)
       .width('100%')
       .height('100%')
 
-      // ===== 使用承诺书门禁：作为 Stack 子节点覆盖整个 HdsNavigation（含标题栏） =====
+      // ===== 使用承诺书门禁：作为 Stack 子节点覆盖整个 Navigation（含标题栏） =====
       if (!this.commitmentAccepted) {
         this.CommitmentDialog()
       }

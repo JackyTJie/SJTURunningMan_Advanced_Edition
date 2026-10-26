@@ -11,14 +11,6 @@
     "deliveryWithInstall": true,
     "installationFree": false,
     "pages": "$profile:main_pages",
-    // 应用级沉浸光感（UIMaterial）开关：enable 表示允许支持的组件启用沉浸式系统材质。
-    // 要求 targetAPIVersion 不低于 26.0.0，且仅在 entry 类型 module 中生效。
-    "metadata": [
-      {
-        "name": "ohos.arkui.UIMaterial.state",
-        "value": "enable"
-      }
-    ],
     "requestPermissions": [
       {
         // 对应 Android INTERNET 权限

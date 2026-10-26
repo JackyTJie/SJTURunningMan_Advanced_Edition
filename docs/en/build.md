@@ -204,6 +204,14 @@ xcodebuild -project apps/ios/SJTURunningMan.xcodeproj -list
 
 Open `apps/harmonyos/` in **DevEco Studio**, pick a signing profile and build the HAP. From the command line:
 
+> **How to spell the SDK version**: `compileSdkVersion` / `targetSdkVersion` / `compatibleSdkVersion` in
+> `build-profile.json5` must be written as `'platform-version(API level)'`, for example `'6.0.1(21)'`.
+> A bare version (`"6.0.1"`) or a made-up one (`"26.0.0"`) gives hvigor no API level to parse, and it aborts
+> with `00306042 Specification Limit Violation … must be string`. This project builds against API 21
+> (HarmonyOS 6.0.1, the SDK bundled with DevEco Studio 6.0.1) and uses plain ArkUI only: `@kit.UIDesignKit`
+> (HDS) and `uiMaterial` exist only in newer SDKs — see
+> [harmonyos.md](./harmonyos.md#8-known-arkts-toolchain-traps).
+
 **Windows**
 
 ```powershell

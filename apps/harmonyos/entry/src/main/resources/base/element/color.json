@@ -71,6 +71,26 @@
     {
       "name": "text_on_brand",
       "value": "#FFFFFF"
+    },
+    {
+      "name": "run_valid",
+      "value": "#A9DCB5"
+    },
+    {
+      "name": "run_invalid",
+      "value": "#DCECD9"
+    },
+    {
+      "name": "calendar_empty",
+      "value": "#EEF2EF"
+    },
+    {
+      "name": "calendar_ink",
+      "value": "#1C3327"
+    },
+    {
+      "name": "success_container",
+      "value": "#E7F6EF"
     }
   ]
 }

@@ -1,21 +1,16 @@
 import { promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
-import { HdsNavDestination } from '@kit.UIDesignKit';
-import { ImmersiveMaterialHelper } from '../common/ImmersiveMaterialHelper';
-import { HDS_MINI_TITLE_BAR_HEIGHT } from '../view/CommonComponents';
 import { AppConfig } from '../config/AppConfig';
 import { UpdateChecker, UpdateResult, UpdateResultKind, ReleaseInfo } from '../service/UpdateChecker';
 
 /**
- * 关于页（二级页，挂载于 Index 的 HdsNavigation 导航栈）
+ * 关于页（二级页，挂载于 Index 的 Navigation 导航栈）
  * 迁移自 Android: com.sjtu.runner.ui.components.AboutDialog
- * - Android 的 TopAppBar action 弹窗 -> HdsNavDestination 二级页（ArkUI 导航栏无 action 槽位）
+ * - Android 的 TopAppBar action 弹窗 -> NavDestination 二级页（系统标题栏 + 返回键）
  * - 内容一致：版本徽标 / 免责声明 / 署名 / 检查更新 / 仓库、水源、下载链接
  */
 @Component
 export struct AboutPage {
-  /** 沉浸光感材质：Logo 卡片（小面积局部容器）；运行时不支持时为 undefined，组件自动降级为普通样式 */
-  private logoCardMaterial = ImmersiveMaterialHelper.regular();
   /** 是否正在检查更新 */
   @State checking: boolean = false;
   /** 检查更新结果 */
@@ -101,7 +96,7 @@ export struct AboutPage {
   }
 
   build() {
-    HdsNavDestination() {
+    NavDestination() {
       Scroll() {
         Column({ space: 16 }) {
           // ===== 头部：Logo + 名称 + 版本徽标 =====
@@ -116,8 +111,6 @@ export struct AboutPage {
             .width(96)
             .height(96)
             .borderRadius(16)
-            // 沉浸光感：Logo 卡片开启常规材质
-            .systemMaterial(this.logoCardMaterial)
 
             Row({ space: 8 }) {
               Text('交我润')
@@ -244,9 +237,8 @@ export struct AboutPage {
             .padding({ left: 8, right: 8 })
         }
         .width('100%')
-        // top 额外叠加 HdsNavigation 标题栏高度（MINI 模式 56vp）：titleBar 是悬浮层覆盖在
-        // 内容上方，不留出等高空间时首屏内容会顶到返回栏下面（官方示例要求预留）。
-        .padding({ left: 16, right: 16, top: HDS_MINI_TITLE_BAR_HEIGHT + 16, bottom: 32 })
+        // NavDestination 自带标题栏在布局中占位（不是悬浮层），内容只需常规内边距。
+        .padding({ left: 16, right: 16, top: 16, bottom: 32 })
       }
       .scrollable(ScrollDirection.Vertical)
       .scrollBar(BarState.Auto)
@@ -254,13 +246,7 @@ export struct AboutPage {
       .height('100%')
       .align(Alignment.Top)
     }
-    .titleBar({
-      content: {
-        title: {
-          mainTitle: '关于'
-        }
-      }
-    })
+    .title('关于')
     .backgroundColor($r('app.color.page_background'))
   }
 

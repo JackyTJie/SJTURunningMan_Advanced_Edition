@@ -8,10 +8,12 @@
       {
         "name": "default",
         "signingConfig": "default",
-        // 编译 SDK 版本：API 26.0.0（HarmonyOS 6+，沉浸光感起始版本）
-        "compileSdkVersion": "26.0.0",
-        // 目标 API 版本：不低于 26.0.0，以适配沉浸光感（Immersive Light）视效
-        "targetSdkVersion": "26.0.0",
+        // 编译 SDK：HarmonyOS 6.0.1（API 21），必须写成「平台版本(API 级别)」。
+        // 写成裸版本号（如 "6.0.1"）或编造的版本（如 "26.0.0"）时 hvigor 解析不出 API 级别，
+        // 会直接报 00306042「must be string」并中止构建。
+        "compileSdkVersion": "6.0.1(21)",
+        // 目标 API 版本：与编译 SDK 对齐
+        "targetSdkVersion": "6.0.1(21)",
         // 最低兼容 HarmonyOS 6.0（API 20）
         "compatibleSdkVersion": "6.0.0(20)",
         "runtimeOS": "HarmonyOS",

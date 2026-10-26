@@ -1,18 +1,14 @@
 import { promptAction } from '@kit.ArkUI';
-import { uiMaterial } from '@kit.ArkUI';
 import { MainViewModel, RunConfig } from '../viewmodel/MainViewModel';
 import { RouteConflict, RouteDecision, RoutePreview, TrackSample } from '../viewmodel/TaskModels';
 import { RouteInfo } from '../model/RouteInfo';
-import {
-  SettingCard,
-  HDS_MINI_TITLE_BAR_HEIGHT
-} from './CommonComponents';
+import { SettingCard } from './CommonComponents';
 import { DistanceSlider, MenuDropdown, MenuOption, NumberField, SectionDivider } from './Controls';
 import { StatusCard, StatItem } from './StatusCard';
 import { ConsoleLog } from './ConsoleLog';
+import { SemesterProgressCard } from './SemesterViews';
 import { RoutePreviewCanvas } from './RoutePreviewCanvas';
 import { parseDate, yesterday, formatDate } from '../utils/FormatUtil';
-import { ImmersiveMaterialHelper } from '../common/ImmersiveMaterialHelper';
 import { AppConfig } from '../config/AppConfig';
 
 /**
@@ -42,8 +38,6 @@ export struct RunScreen {
   viewModel: MainViewModel = MainViewModel.getInstance();
   /** 主导航栈（由 Index 传入），用于跳转登录页/路线设计页 */
   navStack: NavPathStack = new NavPathStack();
-  /** 沉浸光感材质：日志面板（小面积局部容器）；运行时不支持时为 undefined，组件自动降级为普通样式 */
-  private logPanelMaterial: uiMaterial.Material | undefined = ImmersiveMaterialHelper.regular();
 
   // ===== 任务设置状态（等价 Android MainScreen 的 remember 变量） =====
   @State days: number = 1;
@@ -58,6 +52,8 @@ export struct RunScreen {
   @State conflictShown: boolean = false;
   /** 路线距离提醒弹窗可见性（ArkUI AlertDialog 只有两个按钮，无法承载 Android 的三个选项） */
   @State conflictDialogVisible: boolean = false;
+  /** 是否跳过已有记录的日期（数据源在 ViewModel，这里保留一份供开关渲染与点击后立即刷新） */
+  @State skipExisting: boolean = true;
   /**
    * 使用承诺书门禁由 Index 页面以全屏遮罩实现（等价 Android CommitmentDialog）。
    * Android 把门禁渲染在 Scaffold 之外，因此必须由根页面承载；放在本组件内会只遮住 Tab 内容区，
@@ -74,6 +70,20 @@ export struct RunScreen {
       this.showConflictIfNeeded();
     };
     this.showConflictIfNeeded();
+    // 「跳过已有记录的日期」持久化在 ViewModel 里，首次进入时取回
+    this.skipExisting = this.viewModel.skipExisting;
+    // 自动排计划生效后把输入控件对齐（等价 MainScreen 的 LaunchedEffect(autoPlanApplied)）
+    this.viewModel.onAutoPlanApplied = (runs: number, distanceKm: number): void => {
+      this.applyAutoPlan(runs, distanceKm);
+    };
+    // ViewModel 的 notify() 在安卓上同时弹浮层与写日志，这里用 toast 承担浮层
+    this.viewModel.onNotice = (message: string): void => {
+      promptAction.showToast({ message: message, duration: 3000 });
+    };
+    const restored = this.viewModel.autoPlanApplied;
+    if (restored !== undefined) {
+      this.applyAutoPlan(restored.runs, restored.distanceKm);
+    }
   }
 
   private showConflictIfNeeded(): void {
@@ -103,6 +113,16 @@ export struct RunScreen {
     const startDate = parsed !== null ? parsed : yesterday();
     return new RunConfig(this.days, this.distanceKm, this.timeHour, this.timeMinute, this.timeSecond, startDate,
       undefined);
+  }
+
+  /** 把自动排计划的「次数 × 单次距离」写回输入控件 */
+  private applyAutoPlan(runs: number, distanceKm: number): void {
+    this.days = runs;
+    this.showCustomDays = false;
+    this.distanceKm = distanceKm;
+    AppStorage.setOrCreate('distanceKmText', `${distanceKm.toFixed(1)} km`);
+    // 提示文案由 ViewModel 的 notify() 经 onNotice 弹出，这里只回填参数
+    this.viewModel.updateConfig(this.buildConfig());
   }
 
   // ==================== 卡片选项 ====================
@@ -281,6 +301,36 @@ export struct RunScreen {
   }
 
   // ==================== 子构件 ====================
+
+  /** 「跳过已有记录的日期」开关（等价 Android SkipExistingRow，成功色底衬） */
+  @Builder
+  SkipExistingRow() {
+    Row({ space: 4 }) {
+      Checkbox()
+        .select(this.skipExisting)
+        .selectedColor($r('app.color.success_color'))
+        .enabled(!this.viewModel.running)
+        .onChange((value: boolean): void => {
+          this.skipExisting = value;
+          this.viewModel.setSkipExisting(value);
+        })
+      Column({ space: 2 }) {
+        Text('跳过已有记录的日期')
+          .fontSize(13)
+          .fontColor($r('app.color.text_primary'))
+        Text('已有记录的那几天挪到更早日期。')
+          .fontSize(11)
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .padding({ left: 4, right: 14, top: 2, bottom: 2 })
+    .borderRadius(14)
+    .backgroundColor($r('app.color.success_container'))
+    .alignItems(VerticalAlign.Center)
+  }
 
   @Builder
   DaysSelector() {
@@ -607,8 +657,9 @@ export struct RunScreen {
       }
       .width('100%')
       .borderRadius(14)
-      // 沉浸光感：为日志面板这个小面积局部容器开启沉浸式系统材质
-      .systemMaterial(this.logPanelMaterial)
+      // 系统材质降级方案：日志面板本身是半透明底色（log_panel_background），
+      // 叠加原生背景模糊即可得到相近的磨砂效果（API 21 没有 uiMaterial.ImmersiveMaterial）
+      .backgroundBlurStyle(BlurStyle.Thin)
     }
     .width('100%')
     .padding(16)
@@ -721,6 +772,13 @@ export struct RunScreen {
               stats: this.stats()
             })
 
+            // ===== 本学期进度（只读，登录状态下自动同步） =====
+            SemesterProgressCard({
+              loggedIn: this.viewModel.loginState,
+              kmText: this.viewModel.semesterKmText,
+              percentText: this.viewModel.semesterPercentText
+            })
+
             // ===== 重新登录提示 =====
             if (this.viewModel.reloginRequired) {
               this.ReloginBanner()
@@ -761,6 +819,8 @@ export struct RunScreen {
                     this.pickDate();
                   }
                 })
+              // 跳过已有记录的日期：与安卓版一致，位于日期之后、目标距离之前
+              this.SkipExistingRow()
               SettingCard({
                 label: '目标距离',
                 symbol: $r('sys.symbol.figure_run'),
@@ -778,13 +838,12 @@ export struct RunScreen {
             this.DisclaimerNotice()
           }
           .width('100%')
-          // 三边内边距：top 额外叠加 HdsNavigation MINI 标题栏高度（56vp）——
-          // titleBar 为悬浮层覆盖在内容上方，官方示例要求内容首部预留等高空间避让。
-          // bottom 只留常规间距：底部操作栏现在是兄弟节点、已占走自身高度，不再需要预留 120vp。
+          // 三边内边距：标题栏由 Index 自绘、在布局流中占位（不再是覆盖内容的悬浮层），
+          // 这里只需常规间距。bottom 同理：底部操作栏是兄弟节点、已占走自身高度。
           .padding({
             left: 16,
             right: 16,
-            top: HDS_MINI_TITLE_BAR_HEIGHT + 16,
+            top: 16,
             bottom: 16
           })
         }
@@ -795,7 +854,6 @@ export struct RunScreen {
 
         // ===== 底部操作栏 =====
         // 紧贴窗口底部，只保留 8vp 与系统手势条的间距（Navigation 已把内容限制在安全区内）。
-        // 之前这里 padding bottom 64 是给 HdsTabs 悬浮页签预留的，页签已删除，于是底部空出 90vp。
         Column() {
           this.BottomActionBar()
         }
