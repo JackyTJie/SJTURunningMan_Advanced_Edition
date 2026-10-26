@@ -87,7 +87,7 @@ jobs:
             cat "$RUNNER_TEMP/desktop-preview.log"
             exit 1
           fi
-          for check in check login celebration preview-fixes slider-drag live-route; do
+          for check in check login qr-login celebration preview-fixes slider-drag live-route; do
             node "e2e/$check.mjs"
           done
       - name: Upload browser diagnostics

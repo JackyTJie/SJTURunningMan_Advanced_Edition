@@ -36,7 +36,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 
 ## 四套实现的对应关系
 
-同一份逻辑在每个平台各写一遍。Rust 桌面模块在 `desktop/src-tauri/src/`：`task.rs`（生成与任务）、`api.rs`（登录与网络）、`route.rs`（路线、坐标换算与地图 HTML）、`maps.rs`（按需提供内嵌地图页面的本机 HTTP 服务）、`settings.rs`（参数）、`stats.rs`（学期统计）、`preview.rs`（验证码图片适配）、`update.rs`（更新），`commands.rs` 只做 Tauri 命令与状态编排。四个平台的对应关系：
+同一份逻辑在每个平台各写一遍。Rust 桌面模块在 `desktop/src-tauri/src/`：`task.rs`（生成与任务）、`api.rs`（登录与网络）、`qr.rs`（扫码登录的 WebSocket 通道）、`route.rs`（路线、坐标换算与地图 HTML）、`maps.rs`（按需提供内嵌地图页面的本机 HTTP 服务）、`settings.rs`（参数）、`stats.rs`（学期统计）、`preview.rs`（验证码图片适配）、`update.rs`（更新），`commands.rs` 只做 Tauri 命令与状态编排。四个平台的对应关系：
 
 | 职责 | 电脑版 | 安卓 | iOS | 鸿蒙 |
 | --- | --- | --- | --- | --- |
@@ -44,7 +44,7 @@ docs/                  用户文档（中文主 + en/ 镜像）
 | 网络层 | `desktop/src-tauri/src/api.rs` | `network/ApiService.kt` | `ApiService.swift` | `service/ApiService.ets` |
 | 路线管理 | `desktop/src-tauri/src/route.rs` + `route_planner.html` | `route/RouteManager.kt` | `RouteManager.swift` | `service/RouteManager.ets` |
 | 常量配置 | `desktop/src-tauri/src/settings.rs` + `stats.rs` | `config/AppConfig.kt` | `AppConfig.swift` | `config/AppConfig.ets` + `service/SemesterStats.ets` |
-| 登录 | `desktop/src-tauri/src/api.rs` | `login/LoginActivity.kt` | `LoginView.swift` | `pages/Login.ets` |
+| 登录 | `desktop/src-tauri/src/api.rs` + `qr.rs` | `login/LoginActivity.kt` | `LoginView.swift` | `pages/Login.ets` |
 | 坐标工具 | `desktop/src-tauri/src/route.rs` | `utils/GpsUtil.kt` | `GpsUtil.swift` | `service/GpsUtil.ets` |
 
 安卓与 iOS 的参数常量基本一致：`maxRunTimes = 30`、`minDistanceKm = 1.0`、`maxDistanceKm = 5.0`、`intervalSeconds = 3`。

@@ -53,7 +53,11 @@ On the Routes page, use Import TXT and select UTF-8 text with one BD09 longitude
 
 ### How is the graphical CAPTCHA handled?
 
-The desktop client prefills the editable CAPTCHA field using the legacy recognition service. You can correct the result directly, refresh to retry, or fill in the same field manually if recognition fails. Login preserves the legacy delay after recognition and follows the server's returned redirect. Account login and My SJTU app verification have been checked live. When the school requires a six-digit second-factor code, the account holder still needs to receive and enter it.
+The desktop client prefills the editable CAPTCHA field using the legacy recognition service. You can correct the result directly, refresh to retry, or fill in the same field manually if recognition fails. After a rejected account/password submission the client immediately fetches a new captcha, so no extra refresh click is needed. Login preserves the legacy delay after recognition and follows the server's returned redirect. Account login and My SJTU app verification have been checked live. When the school requires a six-digit second-factor code, the account holder still needs to receive and enter it.
+
+### How does QR code login work?
+
+Switch to the QR-code tab at the top of the desktop login dialog. The code comes from the same channel as the school's JAccount login page: the client fetches it over the school's WebSocket subscription and waits for the phone to confirm. Scan it with the My SJTU app, a camera app or WeChat and confirm on the phone; no password is typed on the computer. The code refreshes about once a minute, and "Refresh QR code" fetches a new one. Cookies stay in process memory, and switching back to password login or cancelling stops the subscription. If the code expires or the network drops, refresh it. If the phone shows a confirmed login but the client does not react, refresh once and retry.
 
 ---
 

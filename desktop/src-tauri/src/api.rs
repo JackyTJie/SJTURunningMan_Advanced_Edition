@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-const ACCOUNT: &str = "https://jaccount.sjtu.edu.cn";
+pub(crate) const ACCOUNT: &str = "https://jaccount.sjtu.edu.cn";
 const PORTAL: &str = "https://pe.sjtu.edu.cn";
 const CAPTCHA_SOLVER: &str = "https://geek.sjtu.edu.cn/captcha-solver/";
 const APP_UA: &str = "Mozilla/5.0 (Linux; Android 12; SM-S9080; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.67 Mobile Safari/537.36 TaskCenterApp/3.5.0";
@@ -28,6 +28,7 @@ pub struct Session {
     /// 克隆 Session 时共享，send_code / verify_code 才能看到同一份上下文。
     two_factor: Arc<Mutex<Option<TwoFactorContext>>>,
 }
+#[derive(Clone)]
 pub struct LoginChallenge {
     pub session: Session,
     pub fields: HashMap<String, String>,
@@ -66,17 +67,43 @@ const MAX_CAPTCHA_HEIGHT: u32 = 1_024;
 const MAX_CAPTCHA_ALLOC: u64 = 16 * 1024 * 1024;
 
 pub fn decode_captcha(bytes: &[u8]) -> Result<image::DynamicImage, String> {
+    decode_image(bytes, "验证码接口未返回有效图片，请刷新重试")
+}
+
+/// 网络图片都要先按尺寸上限解码，确认是有效图片后再交给界面。
+pub fn decode_image(bytes: &[u8], invalid: &str) -> Result<image::DynamicImage, String> {
     let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
         .with_guessed_format()
-        .map_err(|_| "验证码接口未返回有效图片，请刷新重试".to_owned())?;
+        .map_err(|_| invalid.to_owned())?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_CAPTCHA_WIDTH);
     limits.max_image_height = Some(MAX_CAPTCHA_HEIGHT);
     limits.max_alloc = Some(MAX_CAPTCHA_ALLOC);
     reader.limits(limits);
-    reader
-        .decode()
-        .map_err(|_| "验证码接口未返回有效图片，请刷新重试".to_owned())
+    reader.decode().map_err(|_| invalid.to_owned())
+}
+
+/// 网络响应体上限：避免异常服务端把内存吃满。
+fn read_bounded(response: Response, limit: usize, message: &str) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    response
+        .take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| message.to_owned())?;
+    if bytes.len() > limit {
+        return Err(message.to_owned());
+    }
+    Ok(bytes)
+}
+
+/// 二维码的 uuid / sig 只允许十六进制与短横线，避免把页面内容带进请求。
+fn valid_token(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .chars()
+            .all(|text| text.is_ascii_hexdigit() || text == '-')
 }
 
 fn checked(response: Result<Response, reqwest::Error>) -> Result<Response, String> {
@@ -104,7 +131,8 @@ impl Session {
         })
     }
 
-    pub fn prepare_login() -> Result<LoginChallenge, String> {
+    /// 打开学校登录页：同一个会话里既有图形验证码，也有扫码登录的二维码通道。
+    fn login_page() -> Result<(Session, HashMap<String, String>, String), String> {
         let session = Self::new()?;
         let response = checked(
             session
@@ -122,13 +150,28 @@ impl Session {
         )?;
         let html = response.text().map_err(network_error)?;
         let fields = login_fields(&html)?;
-        let uuid = fields.get("uuid").ok_or("登录页面缺少验证码信息")?;
-        let image = session.fetch_captcha(ACCOUNT, uuid)?;
+        let uuid = fields
+            .get("uuid")
+            .filter(|value| !value.is_empty())
+            .cloned()
+            .ok_or("登录页面缺少验证码信息")?;
+        Ok((session, fields, uuid))
+    }
+
+    pub fn prepare_login() -> Result<LoginChallenge, String> {
+        let (session, fields, uuid) = Self::login_page()?;
+        let image = session.fetch_captcha(ACCOUNT, &uuid)?;
         Ok(LoginChallenge {
             session,
             fields,
             image,
         })
+    }
+
+    /// 扫码登录只复用登录页的会话与 uuid；二维码票据由 `qr::Channel` 另取。
+    pub fn prepare_qr_login() -> Result<(Session, String), String> {
+        let (session, _fields, uuid) = Self::login_page()?;
+        Ok((session, uuid))
     }
 
     fn fetch_captcha(&self, account: &str, uuid: &str) -> Result<Vec<u8>, String> {
@@ -143,15 +186,7 @@ impl Session {
                 ])
                 .send(),
         )?;
-        let mut image = Vec::new();
-        use std::io::Read;
-        response
-            .take(512 * 1024 + 1)
-            .read_to_end(&mut image)
-            .map_err(|_| "验证码图片读取失败，请重试")?;
-        if image.len() > 512 * 1024 {
-            return Err("验证码图片过大".into());
-        }
+        let image = read_bounded(response, 512 * 1024, "验证码图片读取失败，请重试")?;
         decode_captcha(&image)?;
         Ok(image)
     }
@@ -270,8 +305,102 @@ impl Session {
         if has_auth_cookie(&session.jar) {
             Ok(LoginResult::Authenticated(session))
         } else {
-            Err("登录未成功，请检查账号、密码或刷新图形验证码".into())
+            Err("登录未成功，请检查账号和密码后重试".into())
         }
+    }
+
+    /// 用当前登录会话订阅二维码通道；Cookie 与浏览器打开登录页时保持一致。
+    pub fn open_qr_channel(&self, uuid: &str) -> Result<crate::qr::Channel, String> {
+        let cookie = format!("{ACCOUNT}/jaccount/sub/{uuid}")
+            .parse::<reqwest::Url>()
+            .ok()
+            .and_then(|url| self.jar.cookies(&url))
+            .and_then(|value| value.to_str().ok().map(str::to_owned))
+            .unwrap_or_default();
+        crate::qr::Channel::open_with_cookie(ACCOUNT, uuid, &cookie)
+    }
+
+    /// 取扫码登录用的二维码图片。`ts`/`sig` 来自学校的 WebSocket 推送。
+    pub fn qr_image(&self, uuid: &str, ticket: &crate::qr::Ticket) -> Result<Vec<u8>, String> {
+        self.qr_image_at(ACCOUNT, uuid, ticket)
+    }
+
+    fn qr_image_at(
+        &self,
+        account: &str,
+        uuid: &str,
+        ticket: &crate::qr::Ticket,
+    ) -> Result<Vec<u8>, String> {
+        if !valid_token(uuid) || !valid_token(&ticket.sig) {
+            return Err("二维码信息无效，请重新获取".into());
+        }
+        let ts = ticket.ts.to_string();
+        let response = checked(
+            self.client
+                .get(format!("{account}/jaccount/qrcode"))
+                .header("Referer", account)
+                .query(&[("uuid", uuid), ("ts", ts.as_str()), ("sig", &ticket.sig)])
+                .send(),
+        )?;
+        let image = read_bounded(response, 512 * 1024, "二维码图片读取失败，请重新获取")?;
+        decode_image(&image, "二维码接口未返回有效图片，请重新获取")?;
+        Ok(image)
+    }
+
+    /// 手机确认后，用同一个会话访问 `expresslogin` 完成登录与 OAuth 跳转。
+    pub fn express_login(&self, uuid: &str) -> Result<LoginResult, String> {
+        self.express_login_at(ACCOUNT, uuid)
+    }
+
+    fn express_login_at(&self, account: &str, uuid: &str) -> Result<LoginResult, String> {
+        if !valid_token(uuid) {
+            return Err("二维码信息无效，请重新获取".into());
+        }
+        let response = checked(
+            self.client
+                .get(format!("{account}/jaccount/expresslogin"))
+                .header("Referer", account)
+                .query(&[("uuid", uuid)])
+                .send(),
+        )?;
+        let url = response.url().clone();
+        let text = response.text().map_err(network_error)?;
+        if !has_auth_cookie(&self.jar) {
+            // 二维码过期或确认尚未到达服务端时会退回登录页。
+            return Err("二维码已失效，请重新获取后再扫码".into());
+        }
+        if needs_two_factor(&text) || needs_two_factor(url.as_str()) {
+            let mut context = two_factor_context(&text, url.as_str(), &Value::Null);
+            context.complete_url = Some(url.to_string());
+            if let Ok(mut slot) = self.two_factor.lock() {
+                *slot = Some(context);
+            }
+            return Ok(LoginResult::TwoFactor(self.clone()));
+        }
+        // 和 `verify_code` 一致：拿到认证 Cookie 后再访问一次 authorize，把会话
+        // 落到校园跑（pe.sjtu.edu.cn）。已跳转完成时这一步是无害的。
+        let _ = checked(
+            self.client
+                .get(format!("{account}/oauth2/authorize"))
+                .header("Referer", account)
+                .query(&[
+                    ("response_type", "code"),
+                    ("scope", "profile"),
+                    ("client_id", "9mqzULSXYgUYj5fPOpyL"),
+                    ("state", "8"),
+                    ("redirect_uri", "https://pe.sjtu.edu.cn/oauth2Login"),
+                ])
+                .send(),
+        );
+        Ok(LoginResult::Authenticated(self.clone()))
+    }
+
+    /// 扫码登录如果落到二次验证页，页面上的账号用来回填验证请求。
+    pub fn two_factor_account(&self) -> Option<String> {
+        self.two_factor
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().and_then(|context| context.account.clone()))
     }
 
     pub fn send_code(&self, method: &str) -> Result<(), String> {
@@ -609,7 +738,7 @@ fn counts_toward_score(value: Option<&Value>) -> bool {
 fn login_failure(result: &Value) -> String {
     let error = result["error"].as_str().unwrap_or_default().to_lowercase();
     if error.contains("captcha") || error.contains("验证码") {
-        "图形验证码校验失败，请刷新后重试".into()
+        "图形验证码校验失败，请重新输入验证码后重试".into()
     } else if ["password", "account", "密码", "账号", "账户", "用户名"]
         .iter()
         .any(|word| error.contains(word))
@@ -1228,6 +1357,119 @@ mod tests {
         assert!(error.contains("有效图片"));
         assert!(!error.contains("private-html-response"));
         server.join().unwrap();
+    }
+
+    fn qr_image_png() -> Vec<u8> {
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image::RgbImage::new(185, 185))
+            .write_to(&mut buffer, image::ImageFormat::Png)
+            .unwrap();
+        buffer.into_inner()
+    }
+
+    fn qr_ticket() -> crate::qr::Ticket {
+        crate::qr::Ticket {
+            ts: 1_793_021_453_379,
+            sig: "0fb66cd3059896deb37e0fa6c52c275a".into(),
+        }
+    }
+
+    #[test]
+    fn qr_image_uses_the_signed_ticket_from_the_channel() {
+        let (session, server) = mock(vec![(200, qr_image_png())]);
+        let uuid = "8c71686d-1885-4d6e-a0f6-ce2419ab5fa6";
+        let image = session
+            .qr_image_at(&session.base, uuid, &qr_ticket())
+            .unwrap();
+        assert_eq!(image::load_from_memory(&image).unwrap().width(), 185);
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with(
+            "GET /jaccount/qrcode?uuid=8c71686d-1885-4d6e-a0f6-ce2419ab5fa6&ts=1793021453379&sig=0fb66cd3059896deb37e0fa6c52c275a "
+        ));
+        assert!(requests[0]
+            .to_ascii_lowercase()
+            .contains(&format!("referer: {}\r\n", session.base)));
+    }
+
+    #[test]
+    fn qr_image_rejects_forged_tickets_before_any_request() {
+        let session = Session::new().unwrap();
+        for uuid in ["", "not-a-ticket", "../admin", "a/b"] {
+            assert!(session
+                .qr_image_at(ACCOUNT, uuid, &qr_ticket())
+                .unwrap_err()
+                .contains("无效"));
+        }
+        let forged = crate::qr::Ticket {
+            ts: 1,
+            sig: "../admin".into(),
+        };
+        assert!(session
+            .qr_image_at(ACCOUNT, "ab12", &forged)
+            .unwrap_err()
+            .contains("无效"));
+    }
+
+    #[test]
+    fn express_login_requires_a_confirmed_session() {
+        let (session, server) = mock(vec![(200, "<html>Login jAccount</html>")]);
+        let error = session
+            .express_login_at(&session.base, "8c71686d-1885-4d6e-a0f6-ce2419ab5fa6")
+            .err()
+            .unwrap();
+        assert!(error.contains("二维码已失效"));
+        let requests = server.join().unwrap();
+        assert!(requests[0]
+            .starts_with("GET /jaccount/expresslogin?uuid=8c71686d-1885-4d6e-a0f6-ce2419ab5fa6 "));
+    }
+
+    #[test]
+    fn express_login_completes_oauth_after_auth_cookie() {
+        let (session, server) = mock(vec![
+            (200, "<html>Portal</html>"),
+            (200, "<html>Portal</html>"),
+        ]);
+        session.jar.add_cookie_str(
+            "JAAuthCookie=offline-test-only; Path=/jaccount; Secure",
+            &format!("{ACCOUNT}/jaccount/").parse().unwrap(),
+        );
+        let account = session.base.clone();
+        assert!(matches!(
+            session.express_login_at(&account, "ab12"),
+            Ok(LoginResult::Authenticated(_))
+        ));
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with("GET /jaccount/expresslogin?uuid=ab12 "));
+        assert!(requests[1].starts_with("GET /oauth2/authorize?"));
+    }
+
+    #[test]
+    fn express_login_preserves_a_two_factor_page() {
+        let (session, server) = mock(vec![(
+            200,
+            r#"<html>2fa/loginVerify
+                <input type="hidden" name="account" value="page-account">
+            </html>"#,
+        )]);
+        session.jar.add_cookie_str(
+            "JAAuthCookie=offline-test-only; Path=/jaccount; Secure",
+            &format!("{ACCOUNT}/jaccount/").parse().unwrap(),
+        );
+        let account = session.base.clone();
+        let result = session.express_login_at(&account, "ab12").unwrap();
+        assert!(matches!(result, LoginResult::TwoFactor(_)));
+        assert_eq!(server.join().unwrap().len(), 1);
+    }
+
+    #[test]
+    #[ignore = "访问现有登录服务，只获取匿名二维码，不进行账号登录"]
+    fn live_qr_login_can_be_prepared() {
+        let (session, uuid) = Session::prepare_qr_login().unwrap();
+        let mut channel = session.open_qr_channel(&uuid).unwrap();
+        let ticket = channel.wait_ticket(&AtomicBool::new(false)).unwrap();
+        let image = session.qr_image(&uuid, &ticket).unwrap();
+        assert_eq!(image::load_from_memory(&image).unwrap().width(), 185);
+        channel.close();
     }
 
     #[test]

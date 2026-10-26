@@ -7,16 +7,18 @@ import {
   errorMessage,
   type Bootstrap,
   type CalendarWeek,
+  type LoginMode,
   type LoginPreparation,
   type PreviewMapResult,
   type PreviewRequest,
   type PreviewView,
+  type QrEvent,
   type RouteDetail,
   type RouteView,
   type StatsPayload,
 } from './lib/backend';
 import { useTauriEvent } from './lib/events';
-import { LoginDialog } from './dialogs/LoginDialog';
+import { LoginDialog, type QrStatus } from './dialogs/LoginDialog';
 import { TwoFactorDialog } from './dialogs/TwoFactorDialog';
 import { ConsentDialog } from './dialogs/ConsentDialog';
 import { ConfirmDialog } from './dialogs/ConfirmDialog';
@@ -46,11 +48,16 @@ interface NoticeState {
 interface LoginState {
   open: boolean;
   stage: 1 | 2;
+  mode: LoginMode;
   preparation: LoginPreparation | null;
   loading: boolean;
   notice: string;
   noticeKind: NoticeKind;
   account: string;
+  /** 本轮扫码的序号；后端事件序号不匹配时丢弃。 */
+  qrGeneration: number;
+  qrImage: string;
+  qrStatus: QrStatus;
 }
 
 type ConfirmState = { kind: 'start' } | { kind: 'delete'; routeName: string };
@@ -58,11 +65,15 @@ type ConfirmState = { kind: 'start' } | { kind: 'delete'; routeName: string };
 const initialLogin: LoginState = {
   open: false,
   stage: 1,
+  mode: 'password',
   preparation: null,
   loading: false,
   notice: '',
   noticeKind: 'info',
   account: '',
+  qrGeneration: 0,
+  qrImage: '',
+  qrStatus: 'idle',
 };
 
 function FatalScreen({ message }: { message: string }) {
@@ -121,6 +132,10 @@ export function App() {
   planRef.current = { runs, distance, date, time, route: routeName, skipExisting };
   const routeRef = useRef(route);
   routeRef.current = route;
+  const loginRef = useRef(login);
+  loginRef.current = login;
+  /// 每次打开、关闭或重新提交都递增，晚到的验证码 / 二维码响应据此丢弃。
+  const loginSeq = useRef(0);
   const taskBusyRef = useRef(task.busy);
   taskBusyRef.current = task.busy;
 
@@ -282,9 +297,11 @@ export function App() {
   );
 
   const refreshCaptcha = useCallback(async () => {
+    const seq = ++loginSeq.current;
     setLogin((previous) => ({ ...previous, loading: true, notice: '' }));
     try {
       const preparation = await backend.prepareLogin();
+      if (seq !== loginSeq.current) return;
       setLogin((previous) => ({
         ...previous,
         loading: false,
@@ -293,6 +310,7 @@ export function App() {
         noticeKind: preparation.manual ? 'error' : 'info',
       }));
     } catch (error) {
+      if (seq !== loginSeq.current) return;
       setLogin((previous) => ({
         ...previous,
         loading: false,
@@ -302,6 +320,63 @@ export function App() {
       }));
     }
   }, []);
+
+  const prepareQr = useCallback(async () => {
+    const seq = ++loginSeq.current;
+    setLogin((previous) => ({
+      ...previous,
+      qrStatus: 'loading',
+      qrImage: '',
+      notice: '',
+      noticeKind: 'info',
+    }));
+    try {
+      const preparation = await backend.prepareQrLogin();
+      if (seq !== loginSeq.current) return;
+      setLogin((previous) => ({
+        ...previous,
+        qrGeneration: preparation.generation,
+        qrImage: preparation.qr,
+        qrStatus: 'waiting',
+        notice: '',
+        noticeKind: 'info',
+      }));
+    } catch (error) {
+      if (seq !== loginSeq.current) return;
+      const message = errorMessage(error);
+      setLogin((previous) => ({
+        ...previous,
+        qrStatus: 'error',
+        qrImage: '',
+        notice: message,
+        noticeKind: 'error',
+      }));
+      appendLog(`二维码获取失败：${message}`);
+    }
+  }, [appendLog]);
+
+  const switchLoginMode = useCallback(
+    (mode: LoginMode) => {
+      if (mode === 'qr') {
+        setLogin((previous) => ({ ...previous, mode: 'qr', notice: '', noticeKind: 'info' }));
+        void prepareQr();
+        return;
+      }
+      // 让已经发出的二维码响应失效；重新获取验证码时后端也会停止扫码订阅。
+      loginSeq.current += 1;
+      setLogin((previous) => ({
+        ...previous,
+        mode: 'password',
+        qrStatus: 'idle',
+        qrImage: '',
+        notice: '',
+        noticeKind: 'info',
+      }));
+      // 扫码准备会清掉后端的图形验证码挑战，切回来时重新取一张最稳妥。
+      void refreshCaptcha();
+    },
+    [prepareQr, refreshCaptcha],
+  );
 
   const openLogin = useCallback(() => {
     setLogin({
@@ -340,6 +415,7 @@ export function App() {
 
   const handleSubmitLogin = useCallback(
     (username: string, password: string, captcha: string) => {
+      const seq = ++loginSeq.current;
       setLogin((previous) => ({
         ...previous,
         loading: true,
@@ -349,6 +425,7 @@ export function App() {
       backend
         .submitLogin(username, password, captcha)
         .then((outcome) => {
+          if (seq !== loginSeq.current) return;
           if (outcome.stage === 'authenticated') {
             finishLogin(outcome.user, outcome.notice);
           } else {
@@ -364,13 +441,31 @@ export function App() {
         })
         .catch((error) => {
           const message = errorMessage(error);
+          if (seq !== loginSeq.current) return;
+          appendLog(message);
+          // 图形验证码已随本次提交一起失效，直接换一张，不必让用户再点刷新。
           setLogin((previous) => ({
             ...previous,
             loading: false,
+            preparation: null,
             notice: message,
             noticeKind: 'error',
           }));
-          appendLog(message);
+          void (async () => {
+            try {
+              const preparation = await backend.prepareLogin();
+              if (seq !== loginSeq.current) return;
+              setLogin((previous) => ({ ...previous, preparation }));
+            } catch (refreshError) {
+              if (seq !== loginSeq.current) return;
+              const reason = errorMessage(refreshError);
+              setLogin((previous) => ({
+                ...previous,
+                notice: `${message}；验证码自动刷新失败：${reason}。请点击刷新重试`,
+                noticeKind: 'error',
+              }));
+            }
+          })();
         });
     },
     [appendLog, finishLogin],
@@ -441,6 +536,7 @@ export function App() {
   );
 
   const cancelLogin = useCallback(() => {
+    loginSeq.current += 1;
     setLogin({ ...initialLogin });
     backend.cancelLogin().catch(() => undefined);
   }, []);
@@ -643,6 +739,38 @@ export function App() {
     [notify],
   );
 
+  useTauriEvent<QrEvent>('qr-login', (payload) => {
+    const current = loginRef.current;
+    if (!current.open || payload.generation !== current.qrGeneration) return;
+    if (payload.kind === 'image') {
+      setLogin((previous) =>
+        previous.qrGeneration === payload.generation
+          ? { ...previous, qrImage: payload.qr, qrStatus: 'waiting', notice: '', noticeKind: 'info' }
+          : previous,
+      );
+    } else if (payload.kind === 'authenticated') {
+      finishLogin(payload.user, payload.notice);
+    } else if (payload.kind === 'twoFactor') {
+      setLogin((previous) => ({
+        ...previous,
+        stage: 2,
+        loading: false,
+        account: payload.user,
+        notice: payload.notice,
+        noticeKind: 'info',
+      }));
+    } else {
+      appendLog(payload.message);
+      setLogin((previous) => ({
+        ...previous,
+        qrStatus: 'error',
+        qrImage: '',
+        notice: payload.message,
+        noticeKind: 'error',
+      }));
+    }
+  });
+
   useTauriEvent<{ message: string }>('app-log', (payload) => appendLog(payload.message));
   useTauriEvent<{ message: string }>('task-log', (payload) => appendLog(payload.message));
   useTauriEvent<{ value: number; status: string }>('task-progress', (payload) =>
@@ -809,11 +937,16 @@ export function App() {
       <LoginDialog
         open={login.open && login.stage === 1}
         stage={login.stage}
+        mode={login.mode}
         preparation={login.preparation}
         loading={login.loading}
+        qrImage={login.qrImage}
+        qrStatus={login.qrStatus}
         notice={login.notice}
         noticeKind={login.noticeKind}
-        onRefresh={() => void refreshCaptcha()}
+        onModeChange={switchLoginMode}
+        onRefreshCaptcha={() => void refreshCaptcha()}
+        onRefreshQr={() => void prepareQr()}
         onEdit={() => setLogin((previous) => ({ ...previous, notice: '' }))}
         onSubmit={handleSubmitLogin}
         onCancel={cancelLogin}

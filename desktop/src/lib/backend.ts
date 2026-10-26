@@ -87,6 +87,23 @@ export interface AuthOutcome {
   notice: string;
 }
 
+export type LoginMode = 'password' | 'qr';
+
+export interface QrPreparation {
+  /** 本轮扫码的序号；界面只处理序号相同的事件。 */
+  generation: number;
+  /** 二维码图片的 data URL。 */
+  qr: string;
+  notice: string;
+}
+
+/** 扫码订阅线程推给界面的事件。 */
+export type QrEvent =
+  | { kind: 'image'; generation: number; qr: string }
+  | { kind: 'authenticated'; generation: number; user: string; notice: string }
+  | { kind: 'twoFactor'; generation: number; user: string; notice: string }
+  | { kind: 'failed'; generation: number; message: string };
+
 export interface VerifyOutcome {
   verified: boolean;
   locked: boolean;
@@ -173,6 +190,7 @@ export const backend = {
   openPlanner: () => call<MapOpenResult>('open_planner'),
   openExternal: (kind: 'shuiyuan' | 'project') => call<void>('open_external', { kind }),
   prepareLogin: () => call<LoginPreparation>('prepare_login'),
+  prepareQrLogin: () => call<QrPreparation>('prepare_qr_login'),
   submitLogin: (username: string, password: string, captcha: string) =>
     call<AuthOutcome>('submit_login', { username, password, captcha }),
   sendCode: (method: string) => call<string>('send_code', { method }),
