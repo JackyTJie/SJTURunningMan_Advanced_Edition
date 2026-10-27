@@ -122,7 +122,10 @@ export function RoutePreviewCard({
           </div>
         ) : null}
         {mapUrl ? (
-          <div className="route-map route-map-live" style={{ height: mode === 'routes' ? 380 : 340 }}>
+          <div
+            className={`route-map route-map-live${mode === 'workbench' ? ' is-fill' : ''}`}
+            style={mode === 'routes' ? { height: 380 } : undefined}
+          >
             <iframe
               ref={frameRef}
               onLoad={syncMap}
@@ -135,7 +138,8 @@ export function RoutePreviewCard({
           <RouteMap
             points={points}
             bounds={distanceKm !== undefined ? live.bounds : undefined}
-            height={mode === 'routes' ? 380 : 340}
+            height={380}
+            fill={mode === 'workbench'}
             stale={distanceKm === undefined && stale}
             jumpSegments={jumpSegments}
             label={`${route ? routeDisplayName(route.name) : ''} 轨迹预览`}

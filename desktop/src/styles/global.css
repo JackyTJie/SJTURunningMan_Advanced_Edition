@@ -567,7 +567,20 @@ md-elevated-card.surface-card {
   display: grid;
   grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.workbench-grid .preview-card {
+  height: 100%;
+}
+
+.workbench-grid .preview-card .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.workbench-grid .preview-card .metric-row {
+  flex: 0 0 auto;
 }
 
 .workbench-left {
@@ -577,7 +590,6 @@ md-elevated-card.surface-card {
   min-width: 0;
 }
 
-/* 参数卡的日期日历与下拉菜单要盖住下方预览卡片（单列布局时尤其明显）。 */
 .plan-card {
   position: relative;
   z-index: 2;
@@ -828,6 +840,11 @@ md-elevated-card.surface-card {
   border-radius: var(--md-sys-shape-corner-large);
   border: 1px solid var(--md-sys-color-outline-variant);
   background: var(--md-sys-color-surface-container);
+}
+
+.route-map.is-fill {
+  flex: 1 1 auto;
+  min-height: 320px;
 }
 
 .route-map svg {

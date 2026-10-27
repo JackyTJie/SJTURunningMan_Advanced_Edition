@@ -5,6 +5,7 @@ interface RouteMapProps {
   points: Point[];
   bounds?: Point[];
   height?: number;
+  fill?: boolean;
   stale?: boolean;
   jumpSegments?: number[];
   label?: string;
@@ -61,6 +62,7 @@ export function RouteMap({
   points,
   bounds,
   height = 360,
+  fill = false,
   stale = false,
   jumpSegments = [],
   label,
@@ -96,8 +98,8 @@ export function RouteMap({
   return (
     <div
       ref={containerRef}
-      className={`route-map${stale ? ' is-stale' : ''}`}
-      style={{ height }}
+      className={`route-map${fill ? ' is-fill' : ''}${stale ? ' is-stale' : ''}`}
+      style={fill ? undefined : { height }}
     >
       <svg
         viewBox={`0 0 ${size.width} ${size.height}`}

@@ -13,8 +13,8 @@
       {
         "label": "main",
         "title": "SJTU RunningMan",
-        "width": 1200,
-        "height": 840,
+        "width": 1190,
+        "height": 775,
         "minWidth": 1000,
         "minHeight": 700,
         "center": true,
