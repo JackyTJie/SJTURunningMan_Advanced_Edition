@@ -12,6 +12,15 @@ body{margin:0;overflow:hidden;background:#e7eee8;font:14px system-ui}
 #empty{display:none;position:absolute;inset:0;z-index:1000;align-items:center;justify-content:center;color:#475467;background:#f8fafc;font-size:16px}
 #map-error{display:none;position:absolute;left:12px;bottom:12px;z-index:1000;max-width:calc(100% - 24px);padding:7px 11px;border-radius:10px;background:#ba1a1a;color:#fff;font-size:12px;line-height:18px;box-shadow:0 2px 8px rgb(0 0 0 / 24%)}
 #map-error.show{display:block}
+/* 底图统一去色；暗色主题反转瓦片但不动矢量轨迹。 */
+.leaflet-tile-pane{filter:grayscale(1) contrast(1.04) brightness(1.01);transition:filter .25s ease}
+html[data-theme='dark'] body,html[data-theme='dark'] #map{background:#17181c}
+html[data-theme='dark'] .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.9) contrast(.92)}
+html[data-theme='dark'] .leaflet-control-attribution{background:rgba(28,28,32,.8)!important;color:#cac4d0}
+html[data-theme='dark'] .leaflet-control-attribution a{color:#cac4d0}
+html[data-theme='dark'] .leaflet-bar a{background:#27282e;color:#e6e1e9;border-bottom-color:#3a3b40}
+html[data-theme='dark'] .leaflet-bar a:hover{background:#32333a}
+html[data-theme='dark'] #empty{background:#17181c;color:#cac4d0}
 </style>
 </head>
 <body>
@@ -22,6 +31,11 @@ body{margin:0;overflow:hidden;background:#e7eee8;font:14px system-ui}
 let raw=__POINTS__;
 let updateRoute=null;
 let routeBounds=null;
+function applyTheme(theme){document.documentElement.dataset.theme=theme==='dark'?'dark':'light'}
+window.addEventListener('message',function(event){
+  if(event.source!==parent || event.data?.type!=='sjturm-map-theme')return;
+  applyTheme(event.data.theme);
+});
 window.addEventListener('message',function(event){
   if(event.source!==parent || event.data?.type!=='sjturm-route-update')return;
   const points=event.data.points;

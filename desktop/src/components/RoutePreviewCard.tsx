@@ -32,9 +32,17 @@ export function RoutePreviewCard({
   const live = useLiveRoute(route?.points ?? EMPTY_POINTS, distanceKm);
   const points = distanceKm !== undefined ? live.points : preview?.points ?? route?.points ?? EMPTY_POINTS;
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const postTheme = () => {
+    if (!mapUrl) return;
+    frameRef.current?.contentWindow?.postMessage(
+      { type: 'sjturm-map-theme', theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light' },
+      new URL(mapUrl).origin,
+    );
+  };
   const syncMap = () => {
     if (!mapUrl) return;
     frameRef.current?.contentWindow?.postMessage({ type: 'sjturm-route-update', points, bounds: distanceKm !== undefined ? live.bounds : undefined }, new URL(mapUrl).origin);
+    postTheme();
   };
   const distance = distanceKm !== undefined ? distanceKm : preview ? preview.distanceM / 1000 : route?.distanceKm ?? 0;
   const pointCount = points.length;
@@ -81,6 +89,13 @@ export function RoutePreviewCard({
 
   useEffect(syncMap, [points, mapUrl]);
 
+  // 主题切换不重载 iframe，直接把新主题推给地图页面。
+  useEffect(() => {
+    const observer = new MutationObserver(postTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, [mapUrl]);
+
   const toggleMap = () => setMapExpanded((expanded) => !expanded);
 
   return (
@@ -122,7 +137,10 @@ export function RoutePreviewCard({
           </div>
         ) : null}
         {mapUrl ? (
-          <div className="route-map route-map-live" style={{ height: mode === 'routes' ? 380 : 340 }}>
+          <div
+            className={`route-map route-map-live${mode === 'workbench' ? ' is-fill' : ''}`}
+            style={mode === 'routes' ? { height: 380 } : undefined}
+          >
             <iframe
               ref={frameRef}
               onLoad={syncMap}
@@ -135,7 +153,8 @@ export function RoutePreviewCard({
           <RouteMap
             points={points}
             bounds={distanceKm !== undefined ? live.bounds : undefined}
-            height={mode === 'routes' ? 380 : 340}
+            height={380}
+            fill={mode === 'workbench'}
             stale={distanceKm === undefined && stale}
             jumpSegments={jumpSegments}
             label={`${route ? routeDisplayName(route.name) : ''} 轨迹预览`}

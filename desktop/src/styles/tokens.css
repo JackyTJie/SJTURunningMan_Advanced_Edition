@@ -177,7 +177,7 @@
 
   /* 图标字体 */
   --md-icon-font: 'Material Symbols Rounded';
-  --app-sidebar-width: 248px;
+  --app-sidebar-width: 220px;
 }
 
 :root[data-theme='dark'] {
