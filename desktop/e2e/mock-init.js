@@ -125,7 +125,7 @@ function handle(command, args) {
   switch (command) {
     case 'bootstrap':
       return {
-        version: 'v4.5.0-beta.4',
+        version: 'v4.5.0',
         date: '2026-10-21',
         settings: {
           dark: false,
@@ -211,7 +211,7 @@ function handle(command, args) {
     case 'verify_code':
       return { verified: true, locked: false, message: '二次验证成功' };
     case 'check_update':
-      return '当前 v4.5.0-beta.4 已是最新版本';
+      return '当前 v4.5.0 已是最新版本';
     case 'open_planner':
       return { notice: '规划器已打开：导出 TXT 后通过「导入 TXT」添加' };
     case 'preview_map':

@@ -6,25 +6,25 @@
 
 | 文件 | 尺寸 | 内容 | 体积 |
 | --- | --- | --- | --- |
-| `desktop-tauri-light.webp` | 1000×700 | Tauri 2 + MD3 电脑版浅色工作台，含轨迹预览 | 约 38 KB |
-| `desktop-tauri-dark.webp` | 1000×700 | Tauri 2 + MD3 电脑版深色工作台，含轨迹预览 | 约 37 KB |
+| `desktop-tauri-light.webp` | 1000×651 | Tauri 2 + MD3 电脑版浅色工作台，含计划摘要与内嵌路线地图 | 约 43 KB |
+| `desktop-tauri-dark.webp` | 1000×651 | Tauri 2 + MD3 电脑版深色工作台，含计划摘要与内嵌路线地图 | 约 40 KB |
 | `desktop-tauri-login.webp` | 1000×700 | JAccount 登录窗口（账号密码 / 扫码分段切换），验证码输入框与图片已遮挡 | 约 20 KB |
 | `desktop-tauri-login-qr.webp` | 1000×700 | 扫码登录面板，示例二维码不可用 | 约 27 KB |
-| `desktop-tauri-logs.webp` | 1000×700 | 学期日历与运行日志两栏 | 约 30 KB |
-| `desktop-tauri-routes.webp` | 1000×700 | 导入路线、跳段警告与删除入口 | 约 30 KB |
+| `desktop-tauri-logs.webp` | 1000×700 | 学期日历与运行日志两栏 | 约 17 KB |
+| `desktop-tauri-routes.webp` | 1000×700 | 导入路线、跳段警告与删除入口 | 约 21 KB |
 | `desktop-native-light.webp` | 1000×732 | 旧 Rust + Slint 浅色界面（历史对照） | 约 21 KB |
 | `desktop-native-dark.webp` | 1000×732 | 旧 Rust + Slint 深色界面（历史对照） | 约 21 KB |
 | `desktop-main.webp` | 1000×686 | 旧 Qt 电脑版主界面（历史对照，非当前界面） | 37 KB |
 | `desktop-preview.webp` | 1000×727 | 旧版本机地图页的 OSM 轨迹图（含当时的底图状态条；现预览地图嵌入卡片、固定 OSM 且不显示状态条） | 约 56 KB |
-| `android-main.webp` | 480×1056 | 安卓主界面：参数配置卡片与「一键跑步」按钮 | 21 KB |
+| `android-main.webp` | 480×1056 | 安卓工作台：本学期进度、任务设置与四页底部导航 | 24 KB |
 | `android-route.webp` | 480×1056 | 安卓路线设计页：地图上已连点若干坐标 | 40 KB |
-| `ios-main.webp` | 480×974 | iOS 主界面：参数配置与运行日志 | 21 KB |
+| `ios-main.webp` | 480×1044 | iOS 工作台：本学期进度、任务设置与四页底部导航 | 22 KB |
 | `harmonyos-main.webp` | 480×1069 | 鸿蒙主界面：账号页与跑步参数页 | 26 KB |
 | `macos-install-dmg.webp` | 1000×652 | macOS：DMG 挂载后拖拽安装到 Applications | 15 KB |
 | `macos-gatekeeper.webp` | 534×580 | macOS：首次打开被 Gatekeeper 拦截的弹窗 | 19 KB |
 | `macos-open-anyway.webp` | 1000×849 | macOS：系统设置 → 隐私与安全性 → 仍要打开 | 41 KB |
 
-全部为 WebP。`desktop-tauri-*` 由 mock IPC 下的生产前端截图生成；旧 Rust + Slint 与 Qt 截图保留作历史对照。
+全部为 WebP。`desktop-tauri-*` 由生产前端截图生成，部分界面用 mock IPC 数据填充；旧 Rust + Slint 与 Qt 截图保留作历史对照。
 
 应用界面截图（桌面端 `desktop-tauri-*`、安卓、iOS、鸿蒙）按手机 480 px / 桌面 1000 px 宽存放，其中 `desktop-main.webp` 是迁移前的旧 Qt 界面，仅作历史对照。最后三张是 macOS 的**安装流程**截图，内容是系统弹窗与系统设置界面，按原始比例裁剪，未套用统一宽度。
 
